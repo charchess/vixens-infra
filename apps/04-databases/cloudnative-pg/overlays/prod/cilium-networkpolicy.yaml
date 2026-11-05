@@ -1,0 +1,45 @@
+---
+# cloudnative-pg operator — reçoit des appels webhook de kube-apiserver
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: cloudnative-pg
+  namespace: cnpg-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: cloudnative-pg
+  ingress:
+    # kube-apiserver is the intended source. Some control-plane paths do not
+    # preserve that Cilium identity on ingress, so allow the broader cluster
+    # entity on the webhook port only (Cilium documents this fallback).
+    - fromEntities:
+        - kube-apiserver
+        - cluster
+      toPorts:
+        - ports:
+            - port: "9443"
+              protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: monitoring
+  egress:
+    # cloudnative-pg operator → database instances
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: databases
+    # cloudnative-pg operator → Barman Cloud CNPG-I plugin
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: cnpg-system
+            app.kubernetes.io/name: plugin-barman-cloud
+      toPorts:
+        - ports:
+            - port: "9090"
+              protocol: TCP
+    # cloudnative-pg operator → kube-apiserver (watch PostgreSQL cluster CRDs)
+    - toEntities:
+        - kube-apiserver
+    # retained external egress for current operator integrations
+    - toEntities:
+        - world

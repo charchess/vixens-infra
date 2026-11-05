@@ -1,0 +1,17 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: auth
+resources:
+  - deployment-server.yaml
+  - deployment-worker.yaml
+  - service.yaml
+  - external-secret.yaml
+  - configmap.yaml
+  - middleware-forward-auth.yaml
+  - servicemonitor.yaml
+  - networkpolicy.yaml
+  - cilium-networkpolicy.yaml
+  - networkpolicy-authentik-worker.yaml
+  - pdb-server.yaml
+  - pdb-worker.yaml

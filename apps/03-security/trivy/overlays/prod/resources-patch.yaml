@@ -1,0 +1,25 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trivy-trivy-operator
+  namespace: security
+spec:
+  template:
+    metadata:
+      labels:
+        vixens.io/sizing.trivy-operator: V-medium
+      annotations:
+        vixens.io/service-binding: "false"
+        # trivy-operator V-medium = 1280Mi
+        vixens.io/vpa.max-memory: "1280Mi"
+    spec:
+      priorityClassName: vixens-medium
+      containers:
+        - name: trivy-operator
+          livenessProbe:
+            initialDelaySeconds: 60
+            timeoutSeconds: 10
+          readinessProbe:
+            initialDelaySeconds: 60
+            timeoutSeconds: 10

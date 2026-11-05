@@ -1,0 +1,48 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: authentik
+  namespace: auth
+  labels:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Public DNS resolves to the existing public root, never Traefik's private LB.
+    external-dns.alpha.kubernetes.io/public: "true"
+    external-dns.alpha.kubernetes.io/target: truxonline.com
+    traefik.ingress.kubernetes.io/router.entrypoints: web, websecure
+    traefik.ingress.kubernetes.io/router.middlewares: traefik-redirect-https@kubernetescrd, auth-authentik-cors@kubernetescrd
+    vixens.io/nossoneeded: "true"
+    gethomepage.dev/enabled: "true"
+    gethomepage.dev/group: Security
+    gethomepage.dev/name: Authentik
+    gethomepage.dev/icon: authentik.svg
+    gethomepage.dev/description: Identity provider & SSO
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: authentik.truxonline.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: authentik
+                port:
+                  number: 9000
+    - host: authentik.dev.truxonline.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: authentik
+                port:
+                  number: 9000
+  tls:
+    - hosts:
+        - authentik.truxonline.com
+        - authentik.dev.truxonline.com
+      secretName: authentik-tls

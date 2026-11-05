@@ -1,0 +1,43 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgresql-shared
+  namespace: databases
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  instances: 1
+  priorityClassName: vixens-critical
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.11-system-trixie
+  inheritedMetadata:
+    annotations:
+      vixens.io/service-binding: "false"
+    labels:
+      vixens.io/sizing.postgres: SB-large
+  bootstrap:
+    initdb:
+      database: txo_platform
+      owner: txo_platform
+  postgresql:
+    parameters:
+      max_connections: "500"
+      shared_buffers: 512MB
+      effective_cache_size: 512MB
+  storage:
+    size: 200Gi
+    storageClass: storage-rwo-retain
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  affinity:
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+  monitoring:
+    enablePodMonitor: false

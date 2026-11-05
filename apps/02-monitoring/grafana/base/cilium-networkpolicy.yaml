@@ -1,0 +1,45 @@
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: traefik
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: monitoring
+  egress:
+    # Grafana queries VictoriaMetrics through the in-cluster VMSingle service.
+    # The production cluster has cluster-wide egress default-deny enabled,
+    # so this path must be explicitly allowed.
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: monitoring
+            app.kubernetes.io/name: vmsingle
+      toPorts:
+        - ports:
+            - port: "8428"
+              protocol: TCP
+
+    # Grafana also queries Loki as a provisioned datasource. Keep this scoped
+    # to the Loki workload and API port rather than allowing monitoring-wide
+    # egress.
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: monitoring
+            app: loki
+      toPorts:
+        - ports:
+            - port: "3100"
+              protocol: TCP

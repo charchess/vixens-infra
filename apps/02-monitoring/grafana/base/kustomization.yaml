@@ -1,0 +1,21 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+resources:
+  - external-secret.yaml
+  - cilium-networkpolicy.yaml
+  # Placeholder dashboard files stay in-repo but are not provisioned until they
+  # contain valid Grafana JSON; provisioning `{}` only creates repeated errors.
+  - dashboards/trivy.yaml
+  - dashboards/trivy-vulnerability-explorer.yaml
+  - dashboards/container-image-versions.yaml
+  - dashboards/network-cilium-overview.yaml
+  - dashboards/dataangel.yaml
+  - dashboards/argocd.yaml
+  - dashboards/cert-manager.yaml
+  - dashboards/unifi-snmp.yaml
+  - dashboards/unifi-udm-resources.yaml
+  - dashboards/talos-nodes-overview.yaml
+  - dashboards/mail-import.yaml
+# Helm chart managed by ArgoCD

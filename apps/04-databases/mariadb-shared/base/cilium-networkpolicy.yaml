@@ -1,0 +1,17 @@
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: mariadb-shared
+spec:
+  endpointSelector:
+    matchLabels:
+      app: mariadb-shared
+  ingress:
+    # fromEndpoints: [{}] cassé dans Cilium 1.18.3 → fromEntities: cluster
+    - fromEntities:
+        - cluster
+      toPorts:
+        - ports:
+            - port: "3306"
+              protocol: TCP

@@ -1,0 +1,146 @@
+---
+# Prometheus standalone configuration
+
+# Server configuration
+server:
+  priorityClassName: vixens-critical
+  podLabels:
+    vixens.io/sizing.prometheus-server: "V-xlarge"
+  podAnnotations:
+    vixens.io/fast-start: "true"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+  deploymentAnnotations:  # Deployment metadata (Gold maturity)
+    argocd.argoproj.io/sync-wave: "10"
+    goldilocks.fairwinds.com/enabled: "true"
+    vpa.kubernetes.io/updateMode: "Off"
+  revisionHistoryLimit: 3
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  persistentVolume:
+    enabled: true
+    storageClass: storage-rwo-retain
+    size: 50Gi
+  retention: 30d
+  # WAL replay on 50Gi data takes 10+ minutes — startup probe prevents liveness kill
+  startupProbe:
+    enabled: true
+    periodSeconds: 10
+    failureThreshold: 90
+    timeoutSeconds: 5
+
+# Extra scrape configurations
+extraScrapeConfigs: ""
+
+# Alertmanager configuration
+alertmanager:
+  enabled: true
+  priorityClassName: vixens-critical
+  podAnnotations:
+    vixens.io/fast-start: "true"
+  revisionHistoryLimit: 3
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  persistentVolume:
+    enabled: true
+    storageClass: storage-rwo-retain
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+  extraVolumes:
+    - name: alertmanager-secrets
+      secret:
+        secretName: alertmanager-secrets
+  extraVolumeMounts:
+    - name: alertmanager-secrets
+      mountPath: /etc/alertmanager-secrets
+      readOnly: true
+  extraEnv:
+    - name: DISCORD_WEBHOOK_URL
+      valueFrom:
+        secretKeyRef:
+          name: alertmanager-secrets
+          key: DISCORD_WEBHOOK_URL
+          optional: true
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by:
+        - alertname
+        - cluster
+        - service
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: discord-notifications
+      routes:
+        - match:
+            severity: critical
+          receiver: discord-notifications
+    receivers:
+      - name: discord-notifications
+        slack_configs:
+          - api_url_file: /etc/alertmanager-secrets/DISCORD_WEBHOOK_URL
+            channel: '#alerts'
+            send_resolved: true
+# Node exporter (prometheus-node-exporter subchart, chart 25.x)
+prometheus-node-exporter:
+  enabled: true
+  priorityClassName: vixens-critical
+  podAnnotations:
+    vixens.io/fast-start: "true"
+  # Silence ArgoCD drift on K8s-defaulted DaemonSet fields (maxSurge:0)
+  daemonsetAnnotations:
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  hostNetwork: true
+  hostPID: true
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+# Pushgateway subchart (disabled - réactiver si CronJobs/batch jobs nécessaires)
+prometheus-pushgateway:
+  enabled: false
+# Kube-state-metrics subchart (metrics on Kubernetes objects)
+kube-state-metrics:
+  annotations:  # Deployment metadata (Gold maturity: kube-state-metrics)
+    argocd.argoproj.io/sync-wave: "10"
+    goldilocks.fairwinds.com/enabled: "true"
+    vpa.kubernetes.io/updateMode: "Off"
+  revisionHistoryLimit: 3
+  enabled: true
+  priorityClassName: vixens-critical
+  podAnnotations:
+    vixens.io/fast-start: "true"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi

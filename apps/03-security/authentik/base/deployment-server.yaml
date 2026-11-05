@@ -1,0 +1,117 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authentik-server
+  namespace: auth
+  labels:
+    app: authentik-server
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+    goldilocks.fairwinds.com/enabled: "true"
+    vpa.kubernetes.io/updateMode: "Off"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: authentik-server
+  template:
+    metadata:
+      labels:
+        app: authentik-server
+        vixens.io/backup-profile: critical
+      annotations:
+        reloader.stakater.com/auto: "true"
+        vixens.io/fast-start: "true"
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9300"
+        prometheus.io/path: "/metrics"
+    spec:
+      priorityClassName: vixens-critical
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      volumes:
+        - name: authentik-data
+          emptyDir: {}
+        - name: blueprints
+          configMap:
+            name: authentik-config
+      initContainers: []
+      containers:
+        - name: authentik-server
+          image: ghcr.io/goauthentik/server:2026.8
+          args:
+            - server
+          ports:
+            - containerPort: 9000
+              name: http
+              protocol: TCP
+            - containerPort: 9300
+              name: metrics
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: authentik-secrets
+          env:
+            - name: AUTHENTIK_POSTGRESQL__HOST
+              value: postgresql-shared-rw.databases.svc.cluster.local
+            - name: AUTHENTIK_POSTGRESQL__NAME
+              value: authentik
+            - name: AUTHENTIK_POSTGRESQL__USER
+              value: authentik
+            - name: AUTHENTIK_POSTGRESQL__PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: authentik-secrets
+                  key: postgresql-password
+            - name: AUTHENTIK_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: authentik-secrets
+                  key: AUTHENTIK_SECRET_KEY
+            - name: AUTHENTIK_HTTP__CORS_ORIGINS
+              value: "https://netbird.dev.truxonline.com,https://netbird.truxonline.com"
+            - name: AUTHENTIK_BLUEPRINTS__BOOTSTRAP_AND_OVERWRITE
+              value: "true"
+          startupProbe:
+            httpGet:
+              path: /-/health/live/
+              port: http
+            failureThreshold: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /-/health/live/
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /-/health/live/
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: authentik-data
+              mountPath: /var/lib/authentik
+            - name: blueprints
+              mountPath: /blueprints/vixens-netbird.yaml
+              subPath: vixens-netbird.yaml
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "3"]
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 200m
+            limits:
+              memory: 1024Mi
+              cpu: 500m

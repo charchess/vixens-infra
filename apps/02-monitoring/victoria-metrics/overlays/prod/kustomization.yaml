@@ -1,0 +1,20 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+labels:
+  - includeSelectors: false
+    pairs:
+      environment: prod
+resources:
+  - ../../base
+  - ssa-vmagent.yaml
+  - ssa-vmsingle.yaml
+  - ssa-vmalert.yaml
+  - ssa-vmalertmanager.yaml
+patches:
+  - path: patch-external-secret-env.yaml
+    target:
+      kind: ExternalSecret
+      name: vm-alertmanager-secrets-sync

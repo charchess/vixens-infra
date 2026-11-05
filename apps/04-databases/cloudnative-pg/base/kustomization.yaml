@@ -1,0 +1,28 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cnpg-system
+resources:
+  - cilium-networkpolicy.yaml
+helmCharts:
+  - name: cloudnative-pg
+    releaseName: cloudnative-pg
+    version: 0.29.1
+    repo: https://cloudnative-pg.github.io/charts
+    includeCRDs: true
+    valuesInline:
+      replicaCount: 1
+      config:
+        clusterWide: true
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      podAnnotations:
+        vixens.io/service-binding: "false"
+      podLabels:
+        vixens.io/sizing.cloudnative-pg: G-small
+      commonAnnotations:  # Deployment metadata (Gold maturity)
+        argocd.argoproj.io/sync-wave: "10"
+        goldilocks.fairwinds.com/enabled: "true"
+        vpa.kubernetes.io/updateMode: "Off"

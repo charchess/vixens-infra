@@ -1,0 +1,118 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authentik-worker
+  namespace: auth
+  labels:
+    app: authentik-worker
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+    goldilocks.fairwinds.com/enabled: "true"
+    vpa.kubernetes.io/updateMode: "Off"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: authentik-worker
+  template:
+    metadata:
+      labels:
+        app: authentik-worker
+        vixens.io/service-binding: "false"
+        vixens.io/backup-profile: critical
+      annotations:
+        reloader.stakater.com/auto: "true"
+        vixens.io/service-binding: "false"
+        vixens.io/nometrics: "true"  # authentik-worker has no Prometheus metrics endpoint
+        vixens.io/no-long-connections: "true"
+    spec:
+      priorityClassName: vixens-critical
+      containers:
+        - name: authentik-worker
+          image: ghcr.io/goauthentik/server:2026.8
+          args:
+            - worker
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+          envFrom:
+            - secretRef:
+                name: authentik-secrets
+          env:
+            - name: AUTHENTIK_POSTGRESQL__HOST
+              value: postgresql-shared-rw.databases.svc.cluster.local
+            - name: AUTHENTIK_POSTGRESQL__NAME
+              value: authentik
+            - name: AUTHENTIK_POSTGRESQL__USER
+              value: authentik
+            - name: AUTHENTIK_POSTGRESQL__PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: authentik-secrets
+                  key: postgresql-password
+            - name: AUTHENTIK_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: authentik-secrets
+                  key: AUTHENTIK_SECRET_KEY
+            - name: AUTHENTIK_HTTP__CORS_ORIGINS
+              value: "https://netbird.dev.truxonline.com,https://netbird.truxonline.com"
+            - name: AUTHENTIK_BLUEPRINTS__BOOTSTRAP_AND_OVERWRITE
+              value: "true"
+          livenessProbe:
+            exec:
+              command: ["ak", "healthcheck"]
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command: ["ak", "healthcheck"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 3
+          startupProbe:
+            exec:
+              command: ["ak", "healthcheck"]
+            failureThreshold: 30
+            periodSeconds: 10
+            timeoutSeconds: 10
+          volumeMounts:
+            - name: authentik-data
+              mountPath: /var/lib/authentik
+            - name: blueprints
+              mountPath: /blueprints/vixens-netbird.yaml
+              subPath: vixens-netbird.yaml
+            # A single platform-wide OIDC application and callback.
+            # The ConfigMap is platform-owned (NOT per-tenant), and the
+            # worker spec change rolls the pod on a reviewed GitOps promotion.
+            - name: blueprints
+              mountPath: /blueprints/vixens-fabric-webui.yaml
+              subPath: txo-fabric-webui.yaml
+              readOnly: true
+            - name: fabric-blueprints
+              mountPath: /blueprints/txo-fabric
+              readOnly: true
+      volumes:
+        - name: authentik-data
+          emptyDir: {}
+        - name: blueprints
+          configMap:
+            name: authentik-config
+        - name: fabric-blueprints
+          configMap:
+            name: txo-fabric-authentik-blueprints
+            optional: true
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
