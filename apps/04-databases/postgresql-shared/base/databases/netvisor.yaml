@@ -1,0 +1,12 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: netvisor
+  namespace: databases
+spec:
+  cluster:
+    name: postgresql-shared
+  name: netvisor
+  owner: netvisor
+  ensure: present

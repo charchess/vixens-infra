@@ -1,0 +1,35 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+commonLabels:
+  environment: prod
+resources:
+  - ../../base
+  - pvc-canonical-target.yaml
+components:
+  - ../../../../_shared/components/sync-wave/wave-7
+  - ../../../../_shared/components/goldilocks/enabled
+  - ../../../../_shared/components/poddisruptionbudget/1
+  - ../../../../_shared/components/scheduling/avoid-i915
+
+patches:
+  - path: patch-storage.yaml
+  - path: patch-external-secret-env.yaml
+    target:
+      kind: ExternalSecret
+      name: loki-secrets-sync
+  - target:
+      kind: StatefulSet
+      name: loki
+    patch: |-
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata:
+        name: loki
+      spec:
+        template:
+          metadata:
+            labels:
+              vixens.io/sizing.loki: V-medium
+  # resources-patch.yaml removed — V-medium sizing handled by Kyverno

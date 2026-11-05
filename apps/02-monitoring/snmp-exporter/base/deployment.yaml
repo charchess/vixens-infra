@@ -1,0 +1,207 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snmp-exporter
+  annotations:
+    argocd.argoproj.io/sync-wave: "8"
+    goldilocks.fairwinds.com/enabled: "true"
+    vpa.kubernetes.io/updateMode: "Off"
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: snmp-exporter
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: snmp-exporter
+        vixens.io/sizing-v2: "true"
+        vixens.io/sizing.snmp-exporter: V-nano
+        vixens.io/sizing.init-config: G-nano
+        vixens.io/sizing.init-vmscrape: G-nano
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9116"
+        prometheus.io/path: "/metrics"
+        vixens.io/fast-start: "true"
+        vixens.io/no-long-connections: "true"
+        vixens.io/backup-profile: ephemeral
+    spec:
+      serviceAccountName: snmp-exporter
+      priorityClassName: vixens-low
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      initContainers:
+        - name: init-config
+          image: busybox:1.38
+          command:
+            - sh
+            - -c
+            - 'sed -e "s|\${SNMP_COMMUNITY}|${SNMP_COMMUNITY}|g" -e "s|\${SNMP_COMMUNITY_FULL}|${SNMP_COMMUNITY_FULL}|g" /config-tpl/snmp.yml > /config-out/snmp.yml && echo "Config generated"'
+          env:
+            - name: SNMP_COMMUNITY
+              valueFrom:
+                secretKeyRef:
+                  name: snmp-exporter-secrets
+                  key: SNMP_COMMUNITY
+            - name: SNMP_COMMUNITY_FULL
+              valueFrom:
+                secretKeyRef:
+                  name: snmp-exporter-secrets
+                  key: SNMP_COMMUNITY_FULL
+          volumeMounts:
+            - name: config-tpl
+              mountPath: /config-tpl
+            - name: config-out
+              mountPath: /config-out
+        - name: init-vmscrape
+          image: curlimages/curl:8.22.0
+          command:
+            - sh
+            - -c
+            - |
+              TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+              NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+              APISERVER="https://kubernetes.default.svc"
+              PAYLOAD=$(printf '{
+                "spec": {
+                  "jobName": "snmp-unifi",
+                  "targetEndpoints": [
+                    {
+                      "targets": ["%s"],
+                      "labels": {"device_type": "udm", "device_name": "udm-pro-se"},
+                      "scrapeTimeout": "30s", "interval": "60s", "path": "/snmp",
+                      "params": {"module": ["if_mib"], "auth": ["unifi_v2c_full"]},
+                      "relabelConfigs": [
+                        {"sourceLabels": ["__address__"], "targetLabel": "__param_target"},
+                        {"sourceLabels": ["__param_target"], "targetLabel": "instance"},
+                        {"targetLabel": "__address__", "replacement": "snmp-exporter.monitoring.svc.cluster.local:9116"}
+                      ]
+                    },
+                    {
+                      "targets": ["%s"],
+                      "labels": {"device_type": "udm", "device_name": "udm-pro-se"},
+                      "scrapeTimeout": "30s", "interval": "60s", "path": "/snmp",
+                      "params": {"module": ["udm_resources"], "auth": ["unifi_v2c_full"]},
+                      "relabelConfigs": [
+                        {"sourceLabels": ["__address__"], "targetLabel": "__param_target"},
+                        {"sourceLabels": ["__param_target"], "targetLabel": "instance"},
+                        {"targetLabel": "__address__", "replacement": "snmp-exporter.monitoring.svc.cluster.local:9116"}
+                      ]
+                    },
+                    {
+                      "targets": ["%s", "%s"],
+                      "labels": {"device_type": "switch"},
+                      "scrapeTimeout": "30s", "interval": "60s", "path": "/snmp",
+                      "params": {"module": ["if_mib"], "auth": ["unifi_v2c"]},
+                      "relabelConfigs": [
+                        {"sourceLabels": ["__address__"], "targetLabel": "__param_target"},
+                        {"sourceLabels": ["__param_target"], "targetLabel": "instance"},
+                        {"targetLabel": "__address__", "replacement": "snmp-exporter.monitoring.svc.cluster.local:9116"},
+                        {"sourceLabels": ["instance"], "regex": "%s", "targetLabel": "device_name", "replacement": "switch-baie"},
+                        {"sourceLabels": ["instance"], "regex": "%s", "targetLabel": "device_name", "replacement": "switch-atelier"}
+                      ]
+                    },
+                    {
+                      "targets": ["%s", "%s", "%s", "%s"],
+                      "labels": {"device_type": "ap"},
+                      "scrapeTimeout": "30s", "interval": "60s", "path": "/snmp",
+                      "params": {"module": ["if_mib"], "auth": ["unifi_v2c_full"]},
+                      "relabelConfigs": [
+                        {"sourceLabels": ["__address__"], "targetLabel": "__param_target"},
+                        {"sourceLabels": ["__param_target"], "targetLabel": "instance"},
+                        {"targetLabel": "__address__", "replacement": "snmp-exporter.monitoring.svc.cluster.local:9116"},
+                        {"sourceLabels": ["instance"], "regex": "%s", "targetLabel": "device_name", "replacement": "ap-couloir"},
+                        {"sourceLabels": ["instance"], "regex": "%s", "targetLabel": "device_name", "replacement": "ap-cuisine"},
+                        {"sourceLabels": ["instance"], "regex": "%s", "targetLabel": "device_name", "replacement": "ap-salon"},
+                        {"sourceLabels": ["instance"], "regex": "%s", "targetLabel": "device_name", "replacement": "ap-atelier"}
+                      ]
+                    }
+                  ]
+                }
+              }' \
+                "${SNMP_TARGET_UDM}" \
+                "${SNMP_TARGET_UDM}" \
+                "${SNMP_TARGET_SW_BAIE}" "${SNMP_TARGET_SW_ATELIER}" \
+                "${SNMP_TARGET_SW_BAIE}" "${SNMP_TARGET_SW_ATELIER}" \
+                "${SNMP_TARGET_AP_COULOIR}" "${SNMP_TARGET_AP_CUISINE}" "${SNMP_TARGET_AP_SALON}" "${SNMP_TARGET_AP_ATELIER}" \
+                "${SNMP_TARGET_AP_COULOIR}" "${SNMP_TARGET_AP_CUISINE}" "${SNMP_TARGET_AP_SALON}" "${SNMP_TARGET_AP_ATELIER}")
+              curl -sf -X PATCH \
+                -H "Authorization: Bearer ${TOKEN}" \
+                -H "Content-Type: application/merge-patch+json" \
+                --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+                "${APISERVER}/apis/operator.victoriametrics.com/v1beta1/namespaces/${NS}/vmstaticscrapes/snmp-unifi" \
+                -d "${PAYLOAD}" -o /dev/null && echo "VMStaticScrape patched"
+          env:
+            - name: SNMP_TARGET_UDM
+              valueFrom:
+                secretKeyRef:
+                  name: snmp-exporter-secrets
+                  key: SNMP_TARGET_UDM
+            - name: SNMP_TARGET_SW_BAIE
+              valueFrom:
+                secretKeyRef:
+                  name: snmp-exporter-secrets
+                  key: SNMP_TARGET_SW_BAIE
+            - name: SNMP_TARGET_SW_ATELIER
+              valueFrom:
+                secretKeyRef:
+                  name: snmp-exporter-secrets
+                  key: SNMP_TARGET_SW_ATELIER
+            - name: SNMP_TARGET_AP_COULOIR
+              valueFrom:
+                secretKeyRef:
+                  name: snmp-exporter-secrets
+                  key: SNMP_TARGET_AP_COULOIR
+            - name: SNMP_TARGET_AP_CUISINE
+              valueFrom:
+                secretKeyRef:
+                  name: snmp-exporter-secrets
+                  key: SNMP_TARGET_AP_CUISINE
+            - name: SNMP_TARGET_AP_SALON
+              valueFrom:
+                secretKeyRef:
+                  name: snmp-exporter-secrets
+                  key: SNMP_TARGET_AP_SALON
+            - name: SNMP_TARGET_AP_ATELIER
+              valueFrom:
+                secretKeyRef:
+                  name: snmp-exporter-secrets
+                  key: SNMP_TARGET_AP_ATELIER
+      containers:
+        - name: snmp-exporter
+          image: prom/snmp-exporter:v0.30.1
+          args:
+            - --config.file=/config/snmp.yml
+            - --log.level=info
+          ports:
+            - name: http
+              containerPort: 9116
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: config-out
+              mountPath: /config
+      volumes:
+        - name: config-tpl
+          configMap:
+            name: snmp-exporter-config
+        - name: config-out
+          emptyDir: {}

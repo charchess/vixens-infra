@@ -1,0 +1,25 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+commonLabels:
+  environment: prod
+kind: Kustomization
+
+components:
+  - ../../../../_shared/components/prod-hibernate
+namespace: monitoring
+# NOTE: ArgoCD multi-source limitation — kustomize patches cannot target Helm-rendered resources.
+# patch-alertmanager-command.yaml targeted StatefulSet spec.template (dead code, removed).
+# gold-maturity annotations on StatefulSet also dead code (removed).
+# alertmanager command override is not needed: ExtraEnv + config.global handles Discord webhook.
+patches:
+  - path: patch-external-secret-env.yaml
+    target:
+      kind: ExternalSecret
+      name: prometheus-secrets-sync
+  - path: patch-external-secret-env.yaml
+    target:
+      kind: ExternalSecret
+      name: alertmanager-secrets-sync
+resources:
+  - ../../base
+  - servicemonitors.yaml

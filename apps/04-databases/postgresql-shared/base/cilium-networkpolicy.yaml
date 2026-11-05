@@ -1,0 +1,49 @@
+---
+# postgresql-shared (CloudNativePG cluster) — accès PostgreSQL depuis tous les pods clients
+# Le cluster est partagé entre de nombreux namespaces (auth, networking, services, tools, etc.)
+# L'authentification PostgreSQL protège l'accès au niveau applicatif
+# Les pods CNPG ont le label cnpg.io/cluster: postgresql-shared (pas app.kubernetes.io/name)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: postgresql-shared
+  namespace: databases
+spec:
+  endpointSelector:
+    matchLabels:
+      cnpg.io/cluster: postgresql-shared-recovery
+  ingress:
+    # PostgreSQL depuis tous les pods du cluster (multi-namespace)
+    # fromEndpoints: [{}] cassé dans Cilium 1.18.3 → fromEntities: cluster
+    - fromEntities:
+        - cluster
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+    # Réplication intra-cluster CNPG
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: databases
+            cnpg.io/cluster: postgresql-shared-recovery
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+    # Kubelet health probes depuis host/remote-node
+    - fromEntities:
+        - host
+        - remote-node
+    # CloudNativePG operator — barman backup API (port 8000)
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: cnpg-system
+      toPorts:
+        - ports:
+            - port: "8000"
+              protocol: TCP
+    # Métriques Prometheus (pg_exporter port 9187)
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: monitoring
+  # Egress is intentionally declared only in the dedicated recovery policy.

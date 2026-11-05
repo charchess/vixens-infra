@@ -1,0 +1,141 @@
+---
+# Grafana standalone configuration
+
+# Deployment strategy
+deploymentStrategy:
+  type: Recreate
+# Persistence
+persistence:
+  enabled: true
+  existingClaim: grafana-canonical-target
+  size: 10Gi
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+# Admin credentials via OpenBao + External Secrets Operator (configured separately)
+admin:
+  existingSecret: grafana-admin
+  userKey: admin-user
+  passwordKey: admin-password
+# Datasources configuration
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: VictoriaMetrics
+        type: prometheus
+        url: http://vmsingle-vm-stack.monitoring.svc.cluster.local:8428
+        access: proxy
+        isDefault: true
+        editable: true
+      - name: Loki
+        type: loki
+        url: http://loki.monitoring.svc.cluster.local:3100
+        access: proxy
+        isDefault: false
+        editable: true
+# Resources (Silver: limits defined)
+resources:
+  requests:
+    cpu: 50m
+    memory: 512Mi
+  limits:
+    cpu: 200m
+    memory: 2Gi
+
+priorityClassName: vixens-critical
+# Probes (Elite Status)
+livenessProbe:
+  httpGet:
+    path: /api/health
+    port: 3000
+  initialDelaySeconds: 60
+  timeoutSeconds: 30
+  failureThreshold: 10
+  periodSeconds: 10
+readinessProbe:
+  httpGet:
+    path: /api/health
+    port: 3000
+  initialDelaySeconds: 60
+  timeoutSeconds: 30
+  failureThreshold: 10
+  periodSeconds: 10
+startupProbe:
+  httpGet:
+    path: /api/health
+    port: 3000
+  failureThreshold: 15
+  periodSeconds: 10
+# Pod Annotations for scraping
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "3000"
+  prometheus.io/path: "/metrics"
+  vixens.io/fast-start: "true"
+  # grafana V-medium(1280Mi) + grafana-sc-dashboard V-small(640Mi) = 1920Mi
+  vixens.io/vpa.max-memory: "1920Mi"
+lifecycle:
+  preStop:
+    exec:
+      command: ["sleep", "5"]
+annotations:  # Deployment metadata annotations (Gold maturity: sync-wave + goldilocks)
+  argocd.argoproj.io/sync-wave: "10"
+  goldilocks.fairwinds.com/enabled: "true"
+  vpa.kubernetes.io/updateMode: "Off"
+revisionHistoryLimit: 3
+# Tolerations for control-plane nodes
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+# Service
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+# Sidecar for dashboard discovery
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    searchNamespace: ALL
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 512Mi
+  livenessProbe:
+    exec:
+      command:
+        - ls
+        - /tmp
+    initialDelaySeconds: 30
+    periodSeconds: 60
+    timeoutSeconds: 5
+  readinessProbe:
+    exec:
+      command:
+        - ls
+        - /tmp
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 5
+  startupProbe:
+    exec:
+      command:
+        - ls
+        - /tmp
+    failureThreshold: 15
+    periodSeconds: 10
+    timeoutSeconds: 5
+
+# Deployment labels for maturity tracking (chart uses .Values.labels for deployment metadata)
+labels:
+  app.kubernetes.io/managed-by: argocd
+
+# Pod sizing labels
+podLabels:
+  vixens.io/sizing.grafana: V-medium
+  vixens.io/sizing.grafana-sc-dashboard: V-small

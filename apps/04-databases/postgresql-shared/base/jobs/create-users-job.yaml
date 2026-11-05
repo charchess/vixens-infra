@@ -1,0 +1,58 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgresql-create-users
+  namespace: databases
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  ttlSecondsAfterFinished: 300
+  activeDeadlineSeconds: 180
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app: postgresql-create-users
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      restartPolicy: Never
+      containers:
+        - name: verify-authentik
+          image: postgres:18
+          env:
+            - name: PGHOST
+              value: postgresql-shared-rw
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: authentik
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: authentik-postgresql-cnpg
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: authentik-postgresql-cnpg
+                  key: password
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              for attempt in $(seq 1 60); do
+                if psql -v ON_ERROR_STOP=1 -c 'SELECT current_user, current_database();'; then
+                  echo "Authentik PostgreSQL role/database acceptance passed"
+                  exit 0
+                fi
+                echo "Waiting for declarative Authentik PostgreSQL reconciliation (attempt ${attempt}/60)..."
+                sleep 2
+              done
+              echo "Authentik PostgreSQL role/database acceptance timed out"
+              exit 1
