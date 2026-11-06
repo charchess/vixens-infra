@@ -1,0 +1,24 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: txo-fabric
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+    argocd.argoproj.io/compare-options: ServerSideDiff=false
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/charchess/vixens-infra.git
+    targetRevision: 0dc7cda501f8f36b18d080b83e1efb78dc2fc866
+    path: apps/60-services/txo-fabric/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: txo-fabric-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

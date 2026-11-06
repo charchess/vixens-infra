@@ -1,0 +1,31 @@
+---
+apiVersion: fabric.truxonline.io/v1alpha1
+kind: TenantBundle
+metadata:
+  name: hairem-sandbox
+  labels:
+    app.kubernetes.io/part-of: txo-fabric
+    fabric.truxonline.io/purpose: test
+spec:
+  tenantId: TEN90001
+  displayName: hAIrem Sandbox
+  # No AgentIdentity remains in this recovery cell. Park the mandatory tenant
+  # LiteLLM/CPA compute without deleting shared PostgreSQL or retained workspace.
+  lifecycle:
+    mode: Parked
+  isolation:
+    profile: Shared
+  # Native private agent storage policy, even while this tenant is Parked.
+  agentStorage:
+    retainedStorageClassName: storage-rwo-retain
+    disposableStorageClassName: storage-rwo-delete
+  persistence:
+    postgresql:
+      mode: Shared
+      profileRef: postgresql-shared
+  workspace:
+    profileRef: shared-nfs
+    retentionPolicy: Retain
+    users:
+      - name: client0
+        collaborative: true

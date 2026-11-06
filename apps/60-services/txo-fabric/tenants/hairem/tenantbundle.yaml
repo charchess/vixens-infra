@@ -1,0 +1,62 @@
+---
+apiVersion: fabric.truxonline.io/v1alpha1
+kind: TenantBundle
+metadata:
+  name: hairem
+  annotations:
+    # One-time reviewed approval: append the immutable canonical model only
+    # when the bound store has exactly one valid noncanonical legacy revision.
+    fabric.truxonline.io/openfga-model-migration: append-canonical-v1
+    # Declaratively request reconciliation of the already-reviewed, one-time
+    # recovery transition; it does not alter identity, grants, or runtime gates.
+    fabric.truxonline.io/reconcile-request: hairem-recovery-v2
+
+  labels:
+    app.kubernetes.io/part-of: txo-fabric
+spec:
+  tenantId: TEN00001
+  displayName: hAIrem
+  isolation:
+    profile: Shared
+  # Reviewed retry request. It is inert until retained UID-bound attempt 0
+  # evidence exists and records a terminal failed Job; it never recreates an
+  # absent historical Job.
+  aiGateway:
+    profileRef: litellm-standard
+  # Private Hermes agent storage is tenant-owned, not release-channel-owned.
+  # Existing PVCs are not recreated when this policy is introduced.
+  agentStorage:
+    retainedStorageClassName: storage-rwo-retain
+    disposableStorageClassName: storage-rwo-delete
+  persistence:
+    postgresql:
+      mode: Shared
+      profileRef: postgresql-shared
+  memory:
+    hindsight:
+      profileRef: hindsight-gateway
+      humanAccess: true
+  workspace:
+    profileRef: shared-nfs
+    retentionPolicy: Retain
+    groups:
+      - name: admin
+        collaborative: true
+        skillsCollaborative: true
+    users:
+      - name: charchess
+        collaborative: true
+        skillsCollaborative: true
+  humanAccess:
+    web:
+      iamGroups:
+        - client0
+      domainSuffix: truxonline.com
+      ingressClassName: traefik
+      tlsClusterIssuer: letsencrypt-prod
+      publicDNS: true
+      dnsTarget: truxonline.com
+      oidc:
+        issuer: https://authentik.truxonline.com/application/o/txo-fabric-hairem/
+        clientId: txo-fabric-hairem
+        scopes: openid profile email
