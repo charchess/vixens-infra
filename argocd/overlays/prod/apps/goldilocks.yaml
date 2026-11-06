@@ -1,0 +1,45 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: goldilocks
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "8" # Monitoring/observability tier
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  sources:
+    # Source 1: Helm Chart
+    - repoURL: https://charts.fairwinds.com/stable
+      chart: goldilocks
+      targetRevision: 10.2.0
+      helm:
+        valueFiles:
+          - $values/apps/02-monitoring/goldilocks/values/common.yaml
+          - $values/apps/02-monitoring/goldilocks/values/prod.yaml
+    # Source 2: Values from Git
+    - repoURL: https://github.com/charchess/vixens-infra.git
+      targetRevision: 5504484953053708d6cb62c48e18a05d9e57ce78
+      ref: values
+    # Source 3: Kustomize manifests from Git
+    - repoURL: https://github.com/charchess/vixens-infra.git
+      targetRevision: 5504484953053708d6cb62c48e18a05d9e57ce78
+      path: apps/02-monitoring/goldilocks/overlays/prod
+  # goldilocks chart v10.2.x ignores controller/dashboard.priorityClassName values.
+  # priorityClassName is injected at Deployment admission by mutate-priority-class Rules 11/12.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/template/spec/priorityClassName
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
