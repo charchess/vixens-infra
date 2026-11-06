@@ -4,6 +4,7 @@ kind: Kustomization
 namespace: argocd
 resources:
   - apps/adguard-home.yaml
+  - apps/whoami.yaml
 labels:
   - pairs:
       vixens.io/domain: infra
