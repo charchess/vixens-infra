@@ -1,0 +1,46 @@
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: check-pdb
+  annotations:
+    policies.kyverno.io/title: Require PodDisruptionBudget
+    policies.kyverno.io/category: Maturity (Platinum)
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      To ensure availability during maintenance, critical applications must have a PDB.
+      Single-replica apps (vixens.io/single-replica: "true") are exempt as PDB is meaningless.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: validate-pod-has-pdb
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.app || '' }}"
+            operator: NotEquals
+            value: ""
+      context:
+        - name: pdb_count
+          apiCall:
+            urlPath: "/apis/policy/v1/namespaces/{{request.namespace}}/poddisruptionbudgets"
+            jmesPath: "items[?spec.selector.matchLabels.app == '{{request.object.metadata.labels.app}}'] | length(@)"
+      validate:
+        message: "Pod should be covered by a PodDisruptionBudget for maturity Level 4 (Platinum)."
+        deny:
+          conditions:
+            all:
+              - key: "{{ request.object.metadata.labels.app }}"
+                operator: AnyNotIn
+                value: ["traefik", "argocd-server"]
+              - key: "{{ request.object.metadata.labels.['vixens.io/single-replica'] || '' }}"
+                operator: NotEquals
+                value: "true"
+              - key: "{{ pdb_count }}"
+                operator: Equals
+                value: 0

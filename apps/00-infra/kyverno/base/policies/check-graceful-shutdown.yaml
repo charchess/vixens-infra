@@ -1,0 +1,39 @@
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: check-graceful-shutdown
+  annotations:
+    policies.kyverno.io/title: Require Graceful Shutdown Hook
+    policies.kyverno.io/category: Maturity (Platinum)
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      All containers must define a preStop lifecycle hook for maturity Level 4 (Platinum).
+      Set vixens.io/no-long-connections: "true" to bypass (explicit acknowledgement that
+      the app has no long-lived connections and does not need graceful draining).
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: require-prestop-hook
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kyverno
+          - resources:
+              annotations:
+                vixens.io/no-long-connections: "true"
+      validate:
+        message: "A preStop lifecycle hook is required on all containers (Level 4 Platinum). Set vixens.io/no-long-connections: 'true' to bypass."
+        pattern:
+          spec:
+            containers:
+              - lifecycle:
+                  preStop: {}

@@ -1,0 +1,27 @@
+---
+apiVersion: kyverno.io/v2
+kind: PolicyException
+metadata:
+  name: truenas-csi-probe-exception
+  namespace: kyverno
+  annotations:
+    vixens.io/exception-reason: "CSI sidecars (csi-provisioner, csi-attacher, csi-resizer, csi-snapshotter, csi-node-driver-registrar) are distroless Go binaries communicating via Unix socket. No HTTP/TCP health endpoint available. No exec tools in image."
+spec:
+  exceptions:
+    - policyName: require-probes
+      ruleNames:
+        - check-probes
+        - autogen-check-probes
+  match:
+    any:
+      - resources:
+          kinds:
+            - Pod
+            - ReplicaSet
+            - DaemonSet
+            - StatefulSet
+          namespaces:
+            - truenas-csi
+          names:
+            - "truenas-csi-node*"
+            - "truenas-csi-controller*"

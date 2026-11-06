@@ -1,0 +1,56 @@
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resource-requests
+  annotations:
+    policies.kyverno.io/title: Require Resource Requests or Sizing Label
+    policies.kyverno.io/category: Maturity (Bronze)
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Every container must declare its resource sizing through one of two
+      coherent mechanisms for maturity Level 1 (Bronze):
+        1. A vixens.io/sizing.<container> label (any mode: G-/B-/SB-/V-) — Kyverno
+           injects requests and limits at admission via sizing-v2-mutate.
+        2. Explicit resources.requests in the pod spec (anti-pattern — also triggers
+           check-explicit-resources warning — but satisfies Bronze).
+      Containers with neither are genuinely unsized and block Bronze maturity.
+      Note: this policy validates the declaration, not the runtime state,
+      to avoid false positives from Kyverno-managed admission mutation.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: validate-sizing-declared
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kyverno
+                - cert-manager
+                - external-secrets
+      validate:
+        message: "Container has no sizing declaration. Add a vixens.io/sizing.<container> label or explicit resources.requests."
+        foreach:
+          - list: "request.object.spec.containers"
+            preconditions:
+              all:
+                - key: "{{ request.object.metadata.labels.\"vixens.io/sizing.{{ element.name }}\" || '' }}"
+                  operator: Equals
+                  value: ""
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.resources.requests.cpu || '' }}"
+                    operator: Equals
+                    value: ""
+                  - key: "{{ element.resources.requests.memory || '' }}"
+                    operator: Equals
+                    value: ""

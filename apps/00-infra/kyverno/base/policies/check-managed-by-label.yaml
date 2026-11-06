@@ -1,0 +1,37 @@
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: check-managed-by-label
+  annotations:
+    policies.kyverno.io/title: Check Managed-By Label
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/subject: Deployment, StatefulSet, DaemonSet
+    policies.kyverno.io/description: >-
+      Validates that resources have the app.kubernetes.io/managed-by label set.
+      This label indicates the tool managing the resource (e.g., kustomize, helm).
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: validate-managed-by-label
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kyverno
+      validate:
+        message: "Resource should have app.kubernetes.io/managed-by label."
+        pattern:
+          metadata:
+            labels:
+              app.kubernetes.io/managed-by: "*?"

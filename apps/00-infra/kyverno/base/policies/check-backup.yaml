@@ -1,0 +1,33 @@
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: check-backup
+  annotations:
+    policies.kyverno.io/title: Require Backup Profile
+    policies.kyverno.io/category: Maturity (Emerald)
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      To ensure data durability, applications must define a backup profile level (critical, standard, relaxed, ephemeral).
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: validate-backup-profile-value
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kyverno
+      validate:
+        message: "A valid backup profile (critical, standard, relaxed, ephemeral) is required for Level 5 (Emerald)."
+        pattern:
+          metadata:
+            labels:
+              vixens.io/backup-profile: "critical | standard | relaxed | ephemeral"

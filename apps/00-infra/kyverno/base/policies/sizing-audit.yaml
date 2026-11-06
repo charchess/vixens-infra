@@ -1,0 +1,53 @@
+---
+# Kyverno Policy: Sizing Audit
+#
+# Audits pods that are missing per-container sizing labels (vixens.io/sizing.<name>).
+# Migration to v2 is complete — generic label check removed.
+#
+# Usage: kubectl get policyreports -A
+# PHASE: Audit (read-only, never blocks deployments)
+
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: sizing-audit
+  annotations:
+    policies.kyverno.io/title: Sizing Audit
+    policies.kyverno.io/category: Resource Management
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Audits all pods to ensure they have at least one per-container sizing label
+      (vixens.io/sizing.<container-name>: MODE-size). Pods without any such label
+      will not be sized by sizing-v2-mutate and may receive no resource limits.
+      Run: kubectl get policyreports -A to see audit results.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: check-per-container-sizing
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kyverno
+                - kube-public
+                - kube-node-lease
+      validate:
+        message: >-
+          Pod is missing per-container sizing labels (vixens.io/sizing.<container-name>).
+          All containers must have a v2-style label, e.g. vixens.io/sizing.my-app: B-small.
+          See sizing-v2-mutate policy for supported MODE-size values.
+        deny:
+          conditions:
+            all:
+              # Deny (audit-fail) when NO label key starts with 'vixens.io/sizing.'
+              - key: "{{ request.object.metadata.labels | keys(@) | [?starts_with(@, 'vixens.io/sizing.')] | length(@) }}"
+                operator: Equals
+                value: "0"

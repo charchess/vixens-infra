@@ -1,0 +1,55 @@
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resource-limits
+  annotations:
+    policies.kyverno.io/title: Require Resource Limits or Sizing Label
+    policies.kyverno.io/category: Maturity (Silver)
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Every container must have resource limits managed through a coherent sizing
+      mechanism for maturity Level 2 (Silver):
+        - G-/B-/SB-/V-* sizing label — Kyverno injects limits at admission
+          (G: req==lim, B: 2x mem/10x cpu, SB: 4x mem/10x cpu, V: 4x mem/4x cpu).
+        - Explicit resources.limits in the pod spec (anti-pattern but satisfies Silver).
+      Containers with neither block Silver maturity.
+      Note: validates declaration coherence, not runtime state, to avoid
+      false positives from Kyverno-managed admission mutation.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: validate-limits-declared
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kyverno
+                - cert-manager
+                - external-secrets
+      validate:
+        message: "Container has no limits declaration. Add a vixens.io/sizing.<container> label or explicit resources.limits."
+        foreach:
+          - list: "request.object.spec.containers"
+            preconditions:
+              all:
+                - key: "{{ request.object.metadata.labels.\"vixens.io/sizing.{{ element.name }}\" || '' }}"
+                  operator: Equals
+                  value: ""
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.resources.limits.cpu || '' }}"
+                    operator: Equals
+                    value: ""
+                  - key: "{{ element.resources.limits.memory || '' }}"
+                    operator: Equals
+                    value: ""
