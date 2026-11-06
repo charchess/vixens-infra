@@ -1,0 +1,30 @@
+---
+# Common cert-manager-webhook-gandi configuration for ALL environments
+# Gandi LiveDNS webhook for DNS-01 challenges
+
+# ============================================================================
+# ACME Solver Group Name
+# ============================================================================
+# Group name for the ACME DNS solver
+# Must match the group used in ClusterIssuer
+replicaCount: 1
+groupName: acme.truxonline.com
+# ============================================================================
+# Control Plane Tolerations
+# ============================================================================
+# Webhook runs on control plane nodes
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+# Pod sizing labels
+podLabels:
+  app: webhook-gandi  # For legacy Kyverno policy compatibility
+  vixens.io/sizing.cert-manager-webhook-gandi: G-small
+# Try podAnnotations — chart may not support, but harmless if ignored
+# Actual annotation applied via kustomize overlay patch (cert-manager-webhook-gandi is a known case)
+podAnnotations:
+  vixens.io/fast-start: "true"
+  vixens.io/service-binding: "false"
+  vixens.io/nometrics: "true"
+  vixens.io/no-long-connections: "true"
