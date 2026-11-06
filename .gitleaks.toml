@@ -1,0 +1,8 @@
+title = "Vixens Infra secret scanning policy"
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Non-secret TLS checksum annotation"
+regexTarget = "match"
+regexes = ['tls-secret:\s*[a-f0-9]{8}']

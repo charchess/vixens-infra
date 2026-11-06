@@ -1,0 +1,49 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: maturity-controller
+  namespace: kyverno
+spec:
+  schedule: "*/15 * * * *"
+  timeZone: Europe/Paris
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 3600
+      template:
+        spec:
+          serviceAccountName: maturity-controller
+          initContainers:
+            - name: kubectl-copy
+              image: bitnami/kubectl@sha256:8f59408f9e896fc8992a0660a56687545bd06751f26531b4a26fca6d5dc7562d
+              command:
+                - sh
+                - -c
+                - cp /opt/bitnami/kubectl/bin/kubectl /tools/kubectl
+              volumeMounts:
+                - name: tools
+                  mountPath: /tools
+          containers:
+            - name: controller
+              image: python:3.14-slim
+              command:
+                - python3
+                - /scripts/sync_maturity.py
+              env:
+                - name: PATH
+                  value: "/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+                - name: tools
+                  mountPath: /tools
+          restartPolicy: OnFailure
+          volumes:
+            - name: script
+              configMap:
+                name: maturity-script
+            - name: tools
+              emptyDir: {}

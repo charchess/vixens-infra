@@ -1,0 +1,75 @@
+---
+# ExternalDNS UniFi Configuration (Private/LAN)
+provider: webhook
+priorityClassName: vixens-high
+logLevel: debug
+image:
+  registry: registry.k8s.io
+  repository: external-dns/external-dns
+  tag: v0.23.0
+extraArgs:
+  webhook-provider-url: http://127.0.0.1:8888
+# RBAC permissions for EndpointSlices (required for some sources)
+rbac:
+  create: true
+  extraRules:
+    - apiGroups: ["discovery.k8s.io"]
+      resources: ["endpointslices"]
+      verbs: ["get", "watch", "list"]
+
+# Native K8s sidecar (1.28+): starts before external-dns and its readiness
+# probe must pass before external-dns starts — eliminates startup race condition
+# where external-dns would exit if the webhook wasn't ready within 3 seconds.
+initContainers:
+  - name: unifi-webhook
+    image: ghcr.io/kashalls/external-dns-unifi-webhook:v0.9.0
+    restartPolicy: Always
+    args: ["--host", "0.0.0.0"]
+    ports:
+      - containerPort: 8888
+        name: webhook
+    env:
+      - name: SERVER_HOST
+        value: "0.0.0.0"
+      - name: UNIFI_HOST
+        valueFrom:
+          secretKeyRef:
+            name: external-dns-unifi-secret
+            key: UNIFI_HOST
+      - name: UNIFI_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: external-dns-unifi-secret
+            key: UNIFI_API_KEY
+      - name: LOG_LEVEL
+        value: debug
+      - name: UNIFI_SKIP_TLS_VERIFY
+        value: "true"
+    resources:
+      requests:
+        cpu: "10m"
+        memory: "32Mi"
+      limits:
+        cpu: "50m"
+        memory: "512Mi"
+    livenessProbe:
+      tcpSocket:
+        port: webhook
+      initialDelaySeconds: 10
+      periodSeconds: 10
+    readinessProbe:
+      tcpSocket:
+        port: webhook
+      initialDelaySeconds: 5
+      periodSeconds: 10
+podAnnotations:
+  vixens.io/no-long-connections: "true"
+
+podLabels:
+  vixens.io/sizing.external-dns: G-small
+  vixens.io/sizing.unifi-webhook: G-medium
+
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
