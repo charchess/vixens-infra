@@ -1,0 +1,38 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cert-manager
+# NOTE: This overlay is used by ArgoCD app 'cert-manager-webhook-gandi' (wave 1, Helm multi-source).
+# It patches the Helm-rendered Deployment with ArgoCD sync-wave + Goldilocks VPA annotations.
+#
+# Cert-manager-webhook-gandi (SINTEF v0.5.2) does not support podAnnotations/podLabels in chart.
+# Pod annotations (vixens.io/fast-start, nometrics, service-binding) are injected via:
+#   → mutate-pod-annotations Kyverno policy (match: app.kubernetes.io/name=cert-manager-webhook-gandi)
+# priorityClassName is injected via:
+#   → mutate-priority-class Kyverno policy (chart match on cert-manager namespace)
+# NOTE: strategic merge patch on spec.template.metadata.annotations is dead code in ArgoCD multi-source.
+#
+# The ExternalSecret (gandi-credentials-sync, backed by ClusterSecretStore/openbao)
+# is managed by the dedicated secret source for this webhook; keep ownership
+# separate from the Helm-rendered application resources.
+# Do NOT add resources: ../../base here (was causing SharedResourceWarning double ownership).
+# CNP is included directly as a standalone file to avoid double-ownership.
+#
+resources:
+  - cilium-networkpolicy.yaml
+
+patches:
+  # Patch: Deployment-level annotations (ArgoCD wave, Goldilocks VPA)
+  - patch: |-
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: "10"
+      - op: add
+        path: /metadata/annotations/goldilocks.fairwinds.com~1enabled
+        value: "true"
+      - op: add
+        path: /metadata/annotations/vpa.kubernetes.io~1updateMode
+        value: "Off"
+    target:
+      kind: Deployment
+      name: cert-manager-webhook-gandi
