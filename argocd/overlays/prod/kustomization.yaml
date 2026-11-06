@@ -4,6 +4,7 @@ kind: Kustomization
 namespace: argocd
 resources:
   - apps/adguard-home.yaml
+  - apps/shared-namespaces.yaml
   - apps/whoami.yaml
   - apps/snmp-exporter.yaml
   - apps/grafana-ingress.yaml
