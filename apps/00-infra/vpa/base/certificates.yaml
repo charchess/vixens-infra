@@ -1,0 +1,57 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: vpa-admission-controller-selfsigned
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: vpa-admission-controller-ca
+spec:
+  isCA: true
+  commonName: vpa-admission-controller-ca
+  secretName: vpa-admission-controller-ca
+  duration: 8760h
+  renewBefore: 720h
+  privateKey:
+    algorithm: RSA
+    size: 2048
+    rotationPolicy: Always
+  issuerRef:
+    name: vpa-admission-controller-selfsigned
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: vpa-admission-controller-ca
+spec:
+  ca:
+    secretName: vpa-admission-controller-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: vpa-vertical-pod-autoscaler-admission-controller-tls
+spec:
+  secretName: vpa-vertical-pod-autoscaler-admission-controller-tls
+  commonName: vpa-webhook.vpa.svc
+  dnsNames:
+    - vpa-webhook
+    - vpa-webhook.vpa
+    - vpa-webhook.vpa.svc
+    - vpa-webhook.vpa.svc.cluster.local
+  duration: 2160h
+  renewBefore: 360h
+  privateKey:
+    algorithm: RSA
+    size: 2048
+    rotationPolicy: Always
+  issuerRef:
+    name: vpa-admission-controller-ca
+    kind: Issuer
+    group: cert-manager.io

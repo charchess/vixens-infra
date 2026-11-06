@@ -1,0 +1,63 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vpa-vertical-pod-autoscaler-admission-controller
+  namespace: vpa
+spec:
+  replicas: 0
+  revisionHistoryLimit: 3
+  template:
+    spec:
+      containers:
+      - name: admission-controller
+        resources:
+          limits:
+            cpu: 100m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+      priorityClassName: vixens-high
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender
+  namespace: vpa
+spec:
+  replicas: 0
+  revisionHistoryLimit: 3
+  template:
+    spec:
+      containers:
+      - name: recommender
+        resources:
+          limits:
+            cpu: 100m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+      priorityClassName: vixens-high
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vpa-vertical-pod-autoscaler-updater
+  namespace: vpa
+spec:
+  replicas: 0
+  revisionHistoryLimit: 3
+  template:
+    spec:
+      containers:
+      - name: updater
+        resources:
+          limits:
+            cpu: 100m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+      priorityClassName: vixens-high

@@ -1,0 +1,115 @@
+---
+# keda-operator
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: keda-operator
+  namespace: keda
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: keda-operator
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: monitoring
+    # keda-operator-metrics-apiserver → keda-operator:9666 (internal keda communication)
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: keda
+  egress:
+    # keda-operator → kube-apiserver (watch ScaledObjects, manage HPA)
+    - toEntities:
+        - kube-apiserver
+    # keda-operator → keda http-add-on components (external-scaler:9090, etc.)
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: keda
+    # keda-operator → databases (PostgreSQL ScaledObject triggers)
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: databases
+---
+# keda-admission-webhooks — reçoit des appels de kube-apiserver
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: keda-admission-webhooks
+  namespace: keda
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: keda-admission-webhooks
+  ingress:
+    - fromEntities:
+        - kube-apiserver
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: monitoring
+---
+# keda http-add-on (controller, scaler, interceptor)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: keda-http-add-on
+  namespace: keda
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: http-add-on
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: monitoring
+    # http-add-on internal: external-scaler → interceptor:9090 (scaling coordination)
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: keda
+    # traefik → keda-interceptor-proxy:8080 (all KEDA HTTP scale-to-zero apps)
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: traefik
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+  egress:
+    # keda-http-interceptor proxies HTTP requests to backend services across all namespaces
+    - toEntities:
+        - cluster
+---
+# keda-operator-metrics-apiserver — external metrics API called by kube-apiserver
+# kube-apiserver connects as remote-node (cross-node) or kube-apiserver entity
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: keda-operator-metrics-apiserver
+  namespace: keda
+spec:
+  endpointSelector:
+    matchLabels:
+      app: keda-operator-metrics-apiserver
+  ingress:
+    - fromEntities:
+        - kube-apiserver
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "6443"
+              protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: monitoring
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+  egress:
+    # metrics-apiserver → keda-operator:9666 (aggregate metrics queries)
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: keda

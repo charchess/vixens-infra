@@ -1,0 +1,54 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: vpa
+resources:
+  - namespace.yaml
+  - certificates.yaml
+  - manifests.yaml
+  - pdb-recommender.yaml
+  - pdb-updater.yaml
+  - cilium-networkpolicy.yaml
+
+patches:
+  - patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: vpa-vertical-pod-autoscaler-admission-controller
+      spec:
+        template:
+          metadata:
+            labels:
+              vixens.io/sizing.admission-controller: G-small
+    target:
+      kind: Deployment
+      name: vpa-vertical-pod-autoscaler-admission-controller
+  - patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: vpa-vertical-pod-autoscaler-recommender
+      spec:
+        template:
+          metadata:
+            labels:
+              vixens.io/sizing.recommender: G-small
+    target:
+      kind: Deployment
+      name: vpa-vertical-pod-autoscaler-recommender
+  - patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: vpa-vertical-pod-autoscaler-updater
+      spec:
+        template:
+          metadata:
+            labels:
+              vixens.io/sizing.updater: G-small
+    target:
+      kind: Deployment
+      name: vpa-vertical-pod-autoscaler-updater
+components:
+  - ../../../_shared/components/revision-history-limit

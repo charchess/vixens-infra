@@ -1,0 +1,85 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vpa-vertical-pod-autoscaler-admission-controller
+  namespace: vpa
+spec:
+  revisionHistoryLimit: 3
+  template:
+    metadata:
+      annotations:
+        vixens.io/fast-start: "true"
+        vixens.io/service-binding: "false"
+        vixens.io/nometrics: "true"  # vpa-admission-controller has no Prometheus metrics endpoint
+    spec:
+      priorityClassName: vixens-medium
+      containers:
+        - name: admission-controller
+          resources:
+            requests:
+              cpu: 200m
+              memory: 500Mi
+            limits:
+              cpu: 200m
+              memory: 500Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender
+  namespace: vpa
+spec:
+  revisionHistoryLimit: 3
+  template:
+    metadata:
+      annotations:
+        vixens.io/fast-start: "true"
+        vixens.io/service-binding: "false"
+        vixens.io/no-long-connections: "true"
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8942"
+        prometheus.io/path: "/metrics"
+    spec:
+      priorityClassName: vixens-medium
+      containers:
+        - name: recommender
+          resources:
+            requests:
+              cpu: 200m
+              memory: 1Gi
+            limits:
+              cpu: 200m
+              memory: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vpa-vertical-pod-autoscaler-updater
+  namespace: vpa
+spec:
+  revisionHistoryLimit: 3
+  template:
+    metadata:
+      annotations:
+        vixens.io/fast-start: "true"
+        vixens.io/service-binding: "false"
+        vixens.io/no-long-connections: "true"
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8943"
+        prometheus.io/path: "/metrics"
+    spec:
+      priorityClassName: vixens-medium
+      containers:
+        - name: updater
+          args:
+            - --address=:8943
+            - --v=2
+            - --min-replicas=0
+          resources:
+            requests:
+              cpu: 200m
+              memory: 500Mi
+            limits:
+              cpu: 200m
+              memory: 500Mi
