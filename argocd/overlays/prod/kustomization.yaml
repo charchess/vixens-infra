@@ -5,6 +5,7 @@ namespace: argocd
 resources:
   - apps/adguard-home.yaml
   - apps/shared-namespaces.yaml
+  - apps/mail-gateway.yaml
   - apps/whoami.yaml
   - apps/snmp-exporter.yaml
   - apps/grafana-ingress.yaml
