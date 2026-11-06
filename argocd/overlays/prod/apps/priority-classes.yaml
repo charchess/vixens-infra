@@ -1,0 +1,27 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: priority-classes
+  namespace: argocd
+  labels:
+    vixens.lab/environment: prod
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/charchess/vixens-infra.git
+    targetRevision: fe1688c14548e38472ddf354790af11367f16ef8
+    path: apps/_shared/priority-classes/base
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - Replace=true
