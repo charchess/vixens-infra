@@ -3,6 +3,9 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: argocd
 resources:
+  - apps/renovate.yaml
+  - apps/prometheus-operator-crds.yaml
+  - apps/descheduler.yaml
   - apps/maturity-controller.yaml
   - apps/trivy.yaml
   - apps/external-dns-unifi-secrets.yaml

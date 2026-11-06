@@ -1,0 +1,32 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: renovate
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/charchess/vixens-infra.git
+    targetRevision: f00f7c97b390c82787e7b01f0c51bae972371dc8
+    path: apps/70-tools/renovate/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tools
+  ignoreDifferences:
+    - group: batch
+      kind: CronJob
+      jsonPointers:
+        - /spec/jobTemplate/spec/template/spec/containers/0/imagePullPolicy
+        - /spec/jobTemplate/spec/template/spec/dnsPolicy
+        - /spec/suspend
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
