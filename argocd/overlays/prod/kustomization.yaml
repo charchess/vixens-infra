@@ -6,6 +6,7 @@ resources:
   - apps/adguard-home.yaml
   - apps/whoami.yaml
   - apps/snmp-exporter.yaml
+  - apps/contacts.yaml
 labels:
   - pairs:
       vixens.io/domain: infra
