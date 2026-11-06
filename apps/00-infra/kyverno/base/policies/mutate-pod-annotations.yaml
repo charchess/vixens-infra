@@ -1,0 +1,408 @@
+---
+# Kyverno Policy: Mutate Pod Annotations
+#
+# Injects pod annotations from pod labels (label-driven annotation injection).
+#
+# Supported labels → annotations:
+#
+#   vixens.io/nometrics: "true"
+#     → prometheus.io/scrape: "false"  (exclude from metrics collection)
+#
+#   vixens.io/fast-start: "true"
+#     → vixens.io/fast-start: "true"  (annotation mirrors the label for tools)
+#
+#   vixens.io/service-binding: "false"
+#     → vixens.io/service-binding: "false"  (annotation mirrors the label)
+#
+# Specific rules for charts without podLabels/podAnnotations support:
+#   - cert-manager-webhook-gandi (SINTEF v0.5.2): match app.kubernetes.io/name
+#   - external-secrets (v0.10.x): match control-plane=controller-manager
+#
+# Why this approach:
+#   In ArgoCD multi-source, kustomize patches cannot target Helm-rendered Deployments.
+#   This policy makes annotation injection reproducible from Git via Helm podLabels.
+#
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: mutate-pod-annotations
+  annotations:
+    policies.kyverno.io/title: Mutate Pod Annotations
+    policies.kyverno.io/category: Observability
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Injects pod annotations from pod labels (vixens.io/nometrics, vixens.io/fast-start,
+      vixens.io/service-binding). Handles charts without podLabels support via specific rules.
+spec:
+  validationFailureAction: Audit
+  background: false
+  rules:
+    # Rule 1: vixens.io/nometrics label → annotation (generic)
+    - name: inject-nometrics-annotation
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.\"vixens.io/nometrics\" || '' }}"
+            operator: Equals
+            value: "true"
+      mutate:
+        patchStrategicMerge:
+          metadata:
+            annotations:
+              vixens.io/nometrics: "true"
+
+    # Rule 2: vixens.io/fast-start label → annotation (generic)
+    - name: inject-fast-start-annotation
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.\"vixens.io/fast-start\" || '' }}"
+            operator: Equals
+            value: "true"
+      mutate:
+        patchStrategicMerge:
+          metadata:
+            annotations:
+              vixens.io/fast-start: "true"
+
+    # Rule 3: vixens.io/service-binding label → annotation (generic)
+    - name: inject-service-binding-annotation
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.\"vixens.io/service-binding\" || '' }}"
+            operator: NotEquals
+            value: ""
+      mutate:
+        patchStrategicMerge:
+          metadata:
+            annotations:
+              vixens.io/service-binding: "{{ request.object.metadata.labels.\"vixens.io/service-binding\" }}"
+
+    # Rule 4: cert-manager-webhook-gandi — chart has no podAnnotations support
+    # SINTEF chart v0.5.2 does not render spec.template.metadata.annotations at all.
+    # Match on app.kubernetes.io/name in cert-manager namespace.
+    # Also injects probe config: SINTEF chart defaults to initialDelaySeconds=0 and
+    # failureThreshold=3, but the webhook TLS certificate can take 13-25s to load (longer on
+    # memory-pressured nodes). initialDelaySeconds:30 + failureThreshold:6 = 90s total tolerance.
+    - name: inject-annotations-cert-manager-webhook-gandi
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - cert-manager
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: cert-manager-webhook-gandi
+      mutate:
+        patchStrategicMerge:
+          metadata:
+            annotations:
+              vixens.io/fast-start: "true"
+              vixens.io/service-binding: "false"
+              vixens.io/nometrics: "true"
+              vixens.io/no-long-connections: "true"
+            labels:
+              vixens.io/sizing.cert-manager-webhook-gandi: G-small
+          spec:
+            containers:
+              - (name): cert-manager-webhook-gandi
+                livenessProbe:
+                  initialDelaySeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 6
+                readinessProbe:
+                  initialDelaySeconds: 20
+                  timeoutSeconds: 5
+
+    # Rule 5: grafana — chart lifecycle key is silently ignored (chart bug in monitored versions)
+    # The lifecycle.preStop hook set in values.yaml is not rendered by the grafana Helm chart,
+    # causing check-graceful-shutdown to fail. Injecting no-long-connections bypass at Pod admission.
+    - name: inject-annotations-grafana
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - monitoring
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: grafana
+      mutate:
+        patchStrategicMerge:
+          metadata:
+            annotations:
+              vixens.io/no-long-connections: "true"
+
+    # Rule 6: external-secrets — chart has no podAnnotations support
+    # Match on control-plane=controller-manager in external-secrets namespace.
+    # Injects prometheus scrape annotations (metrics on port 8443 via HTTPS).
+    - name: inject-annotations-external-secrets
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - external-secrets
+              selector:
+                matchLabels:
+                  control-plane: controller-manager
+      mutate:
+        patchStrategicMerge:
+          metadata:
+            annotations:
+              vixens.io/fast-start: "true"
+              vixens.io/service-binding: "false"
+              vixens.io/no-long-connections: "true"
+              prometheus.io/scrape: "true"
+              prometheus.io/port: "8443"
+              prometheus.io/path: "/metrics"
+              prometheus.io/scheme: "https"
+            labels:
+              vixens.io/sizing.manager: G-small
+
+    # Rules 7-9: keda-add-ons-http Deployments — chart v0.13.x ignores per-component podLabels,
+    # so sizing labels never reach the pod template spec. Injected at Deployment admission.
+    # check-sizing-mode (Platinum) validates vixens.io/sizing.<container> on the pod template.
+    # ArgoCD ignoreDifferences on the label paths prevents drift detection.
+
+    - name: inject-sizing-label-keda-operator-deployment
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              namespaces:
+                - keda
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: http-add-on
+                  app.kubernetes.io/component: operator
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.template.metadata.labels.\"vixens.io/sizing.keda-add-ons-http-operator\" || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /spec/template/metadata/labels/vixens.io~1sizing.keda-add-ons-http-operator
+            value: "G-nano"
+
+    - name: inject-sizing-label-keda-scaler-deployment
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              namespaces:
+                - keda
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: http-add-on
+                  app.kubernetes.io/component: scaler
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.template.metadata.labels.\"vixens.io/sizing.keda-add-ons-http-external-scaler\" || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /spec/template/metadata/labels/vixens.io~1sizing.keda-add-ons-http-external-scaler
+            value: "G-nano"
+
+    - name: inject-sizing-label-keda-interceptor-deployment
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              namespaces:
+                - keda
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: http-add-on
+                  app.kubernetes.io/component: interceptor
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.template.metadata.labels.\"vixens.io/sizing.keda-add-ons-http-interceptor\" || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /spec/template/metadata/labels/vixens.io~1sizing.keda-add-ons-http-interceptor
+            value: "G-nano"
+
+    # Rule 10: cert-manager-webhook-gandi Deployment — SINTEF chart v0.5.2 ignores topologySpreadConstraints.
+    # Injected at Deployment admission. ArgoCD ignoreDifferences prevents drift detection.
+    - name: inject-topology-spread-cert-manager-webhook-gandi
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              namespaces:
+                - cert-manager
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: cert-manager-webhook-gandi
+      preconditions:
+        all:
+          - key: "{{ length(request.object.spec.template.spec.topologySpreadConstraints || `[]`) }}"
+            operator: Equals
+            value: "0"
+      mutate:
+        patchStrategicMerge:
+          spec:
+            template:
+              spec:
+                topologySpreadConstraints:
+                  - maxSkew: 1
+                    topologyKey: kubernetes.io/hostname
+                    whenUnsatisfiable: ScheduleAnyway
+                    labelSelector:
+                      matchLabels:
+                        app.kubernetes.io/name: cert-manager-webhook-gandi
+
+    # Rules 11-13: keda core Deployments — chart v2.17.x has no deployment-level annotation support.
+    # Goldilocks/VPA/sync-wave/sizing-rationale injected at Deployment admission via Kyverno.
+    # ArgoCD ignoreDifferences on annotation paths prevents drift detection.
+
+    - name: inject-goldilocks-keda-operator
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              namespaces:
+                - keda
+              selector:
+                matchLabels:
+                  app: keda-operator
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.annotations.\"goldilocks.fairwinds.com/enabled\" || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /metadata/annotations/goldilocks.fairwinds.com~1enabled
+            value: "true"
+          - op: add
+            path: /metadata/annotations/vpa.kubernetes.io~1updateMode
+            value: "Off"
+          - op: add
+            path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+            value: "1"
+          - op: add
+            path: /metadata/annotations/vixens.io~1sizing-rationale
+            value: "G-nano: KEDA operator lightweight Go process, ~20Mi steady-state"
+
+    - name: inject-goldilocks-keda-metrics-apiserver
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              namespaces:
+                - keda
+              selector:
+                matchLabels:
+                  app: keda-operator-metrics-apiserver
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.annotations.\"goldilocks.fairwinds.com/enabled\" || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /metadata/annotations/goldilocks.fairwinds.com~1enabled
+            value: "true"
+          - op: add
+            path: /metadata/annotations/vpa.kubernetes.io~1updateMode
+            value: "Off"
+          - op: add
+            path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+            value: "1"
+          - op: add
+            path: /metadata/annotations/vixens.io~1sizing-rationale
+            value: "G-nano: KEDA metrics adapter lightweight Go process, ~30Mi steady-state"
+
+    - name: inject-goldilocks-keda-admission-webhooks
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              namespaces:
+                - keda
+              selector:
+                matchLabels:
+                  app: keda-admission-webhooks
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.annotations.\"goldilocks.fairwinds.com/enabled\" || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /metadata/annotations/goldilocks.fairwinds.com~1enabled
+            value: "true"
+          - op: add
+            path: /metadata/annotations/vpa.kubernetes.io~1updateMode
+            value: "Off"
+          - op: add
+            path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+            value: "1"
+          - op: add
+            path: /metadata/annotations/vixens.io~1sizing-rationale
+            value: "G-nano: KEDA admission webhook lightweight Go process, ~25Mi steady-state"
+
+    - name: inject-goldilocks-crowdsec-lapi
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              namespaces:
+                - crowdsec
+              names:
+                - crowdsec-lapi
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.annotations.\"goldilocks.fairwinds.com/enabled\" || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /metadata/annotations/goldilocks.fairwinds.com~1enabled
+            value: "true"
+          - op: add
+            path: /metadata/annotations/vpa.kubernetes.io~1updateMode
+            value: "Off"
+          - op: add
+            path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+            value: "1"

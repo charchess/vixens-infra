@@ -1,0 +1,244 @@
+---
+# Kyverno Policy: Sizing V2 Mutation
+#
+# Manages resource requests/limits for pods using the v2 label format:
+#   vixens.io/sizing.<container-name>: <MODE>-<size>
+#
+# Modes:
+#   G-*  : Guaranteed QoS — req == lim (CPU and memory)
+#   B-*  : Burstable     — mem lim = 2x req, cpu lim = 10x req
+#   SB-* : Super Burstable — mem lim = 4x req, cpu lim = 10x req
+#   V-*  : VPA-managed   — mem lim = 4x req, cpu lim = 4x req (VPA maintains ratio via RequestsAndLimits)
+#
+# Sizes: nano | micro | small | medium | large | xlarge | 2xlarge | media-xlarge
+#
+# Containers WITHOUT a v2 label are NOT touched by this policy.
+# They receive sidecar defaults from the unlabeled-sidecar-defaults rule.
+#
+# Coexistence: sizing-mutate.yaml (v1) handles labels micro/small/medium/large.
+# This policy (v2) handles G-/B-/SB-/V- modes AND special tiers (media-xlarge).
+#
+# IMPLEMENTATION NOTE: Context variables are used for all value expressions.
+# Kyverno 1.14 does not allow expressions starting with '(' in patchStrategicMerge
+# fields, and does not interpolate label keys with dynamic names in patches.
+# Using context variables resolves both issues.
+#
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: sizing-v2-mutate
+  annotations:
+    policies.kyverno.io/title: Sizing V2 Mutation
+    policies.kyverno.io/category: Resource Management
+    policies.kyverno.io/description: >-
+      Declarative resource management using per-container v2 labels.
+      Supports 4 modes: G- (Guaranteed), B- (Burstable), SB- (Super Burstable),
+      V- (VPA-managed initial sizing). Unlabeled containers receive sidecar defaults.
+spec:
+  validationFailureAction: Audit
+  background: false
+  rules:
+    # Rule 1: Main containers with explicit v2 sizing labels
+    - name: v2-container-sizing
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              names:
+                - trivy-server
+              namespaces:
+                - security
+          - resources:
+              names:
+                - helper-pod  # local-path provisioner ephemeral helper pods (any namespace)
+      mutate:
+        foreach:
+          - list: "request.object.spec.containers || '[]'"
+            context:
+              - name: sizingLabel
+                variable:
+                  value: "{{ request.object.metadata.labels.\"vixens.io/sizing.{{element.name}}\" || 'NONE' }}"
+              - name: cpuReq
+                variable:
+                  value: "{{ sizingLabel == 'V-3xlarge' && '1000m' || sizingLabel == 'G-2xlarge' && '500m' || sizingLabel == 'B-2xlarge' && '500m' || sizingLabel == 'SB-2xlarge' && '500m' || sizingLabel == 'V-2xlarge' && '500m' || sizingLabel == 'G-xlarge' && '200m' || sizingLabel == 'B-xlarge' && '200m' || sizingLabel == 'SB-xlarge' && '200m' || sizingLabel == 'V-xlarge' && '200m' || sizingLabel == 'G-large' && '100m' || sizingLabel == 'B-large' && '100m' || sizingLabel == 'SB-large' && '100m' || sizingLabel == 'V-large' && '100m' || sizingLabel == 'G-medium' && '50m' || sizingLabel == 'B-medium' && '50m' || sizingLabel == 'SB-medium' && '50m' || sizingLabel == 'V-medium' && '50m' || sizingLabel == 'G-small' && '25m' || sizingLabel == 'B-small' && '25m' || sizingLabel == 'SB-small' && '25m' || sizingLabel == 'V-small' && '25m' || sizingLabel == 'G-micro' && '10m' || sizingLabel == 'B-micro' && '10m' || sizingLabel == 'SB-micro' && '10m' || sizingLabel == 'V-micro' && '10m' || sizingLabel == 'G-nano' && '5m' || sizingLabel == 'B-nano' && '5m' || sizingLabel == 'SB-nano' && '5m' || sizingLabel == 'V-nano' && '5m' || '10m' }}"
+              - name: memReq
+                variable:
+                  value: "{{ sizingLabel == 'V-3xlarge' && '8Gi' || sizingLabel == 'G-2xlarge' && '4Gi' || sizingLabel == 'B-2xlarge' && '4Gi' || sizingLabel == 'SB-2xlarge' && '4Gi' || sizingLabel == 'V-2xlarge' && '4Gi' || sizingLabel == 'G-xlarge' && '2Gi' || sizingLabel == 'B-xlarge' && '2Gi' || sizingLabel == 'SB-xlarge' && '2Gi' || sizingLabel == 'V-xlarge' && '2Gi' || sizingLabel == 'G-large' && '1Gi' || sizingLabel == 'B-large' && '1Gi' || sizingLabel == 'SB-large' && '1Gi' || sizingLabel == 'V-large' && '1Gi' || sizingLabel == 'G-medium' && '512Mi' || sizingLabel == 'B-medium' && '512Mi' || sizingLabel == 'SB-medium' && '512Mi' || sizingLabel == 'V-medium' && '512Mi' || sizingLabel == 'G-small' && '256Mi' || sizingLabel == 'B-small' && '256Mi' || sizingLabel == 'SB-small' && '256Mi' || sizingLabel == 'V-small' && '256Mi' || sizingLabel == 'G-micro' && '128Mi' || sizingLabel == 'B-micro' && '128Mi' || sizingLabel == 'SB-micro' && '128Mi' || sizingLabel == 'V-micro' && '128Mi' || sizingLabel == 'G-nano' && '64Mi' || sizingLabel == 'B-nano' && '64Mi' || sizingLabel == 'SB-nano' && '64Mi' || sizingLabel == 'V-nano' && '64Mi' || '128Mi' }}"
+              - name: cpuLim
+                variable:
+                  value: "{{ sizingLabel == 'V-3xlarge' && '4000m' || sizingLabel == 'G-2xlarge' && '500m' || sizingLabel == 'G-xlarge' && '200m' || sizingLabel == 'G-large' && '100m' || sizingLabel == 'G-medium' && '50m' || sizingLabel == 'G-small' && '25m' || sizingLabel == 'G-micro' && '10m' || sizingLabel == 'G-nano' && '5m' || sizingLabel == 'B-2xlarge' && '2000m' || sizingLabel == 'SB-2xlarge' && '2000m' || sizingLabel == 'B-xlarge' && '2000m' || sizingLabel == 'SB-xlarge' && '2000m' || sizingLabel == 'B-large' && '1000m' || sizingLabel == 'SB-large' && '1000m' || sizingLabel == 'B-medium' && '500m' || sizingLabel == 'SB-medium' && '500m' || sizingLabel == 'B-small' && '250m' || sizingLabel == 'SB-small' && '250m' || sizingLabel == 'B-micro' && '100m' || sizingLabel == 'SB-micro' && '100m' || sizingLabel == 'B-nano' && '50m' || sizingLabel == 'SB-nano' && '50m' || sizingLabel == 'V-2xlarge' && '2000m' || sizingLabel == 'V-xlarge' && '800m' || sizingLabel == 'V-large' && '400m' || sizingLabel == 'V-medium' && '200m' || sizingLabel == 'V-small' && '100m' || sizingLabel == 'V-micro' && '40m' || sizingLabel == 'V-nano' && '20m' || '100m' }}"
+              - name: memLim
+                variable:
+                  value: "{{ sizingLabel == 'V-3xlarge' && '32Gi' || sizingLabel == 'G-2xlarge' && '4Gi' || sizingLabel == 'G-xlarge' && '2Gi' || sizingLabel == 'G-large' && '1Gi' || sizingLabel == 'G-medium' && '512Mi' || sizingLabel == 'G-small' && '256Mi' || sizingLabel == 'G-micro' && '128Mi' || sizingLabel == 'G-nano' && '64Mi' || sizingLabel == 'B-2xlarge' && '8Gi' || sizingLabel == 'B-xlarge' && '4Gi' || sizingLabel == 'B-large' && '2Gi' || sizingLabel == 'B-medium' && '1Gi' || sizingLabel == 'B-small' && '512Mi' || sizingLabel == 'B-micro' && '256Mi' || sizingLabel == 'B-nano' && '128Mi' || sizingLabel == 'SB-2xlarge' && '16Gi' || sizingLabel == 'SB-xlarge' && '8Gi' || sizingLabel == 'SB-large' && '4Gi' || sizingLabel == 'SB-medium' && '2Gi' || sizingLabel == 'SB-small' && '1Gi' || sizingLabel == 'SB-micro' && '512Mi' || sizingLabel == 'SB-nano' && '256Mi' || sizingLabel == 'V-2xlarge' && '16Gi' || sizingLabel == 'V-xlarge' && '8Gi' || sizingLabel == 'V-large' && '4Gi' || sizingLabel == 'V-medium' && '2Gi' || sizingLabel == 'V-small' && '1Gi' || sizingLabel == 'V-micro' && '512Mi' || sizingLabel == 'V-nano' && '256Mi' || '512Mi' }}"
+            preconditions:
+              any:
+                - key: "{{ sizingLabel }}"
+                  operator: AnyIn
+                  value:
+                    - G-nano
+                    - G-micro
+                    - G-small
+                    - G-medium
+                    - G-large
+                    - G-xlarge
+                    - G-2xlarge
+                    - B-nano
+                    - B-micro
+                    - B-small
+                    - B-medium
+                    - B-large
+                    - B-xlarge
+                    - B-2xlarge
+                    - SB-nano
+                    - SB-micro
+                    - SB-small
+                    - SB-medium
+                    - SB-large
+                    - SB-xlarge
+                    - SB-2xlarge
+                    - V-nano
+                    - V-micro
+                    - V-small
+                    - V-medium
+                    - V-large
+                    - V-xlarge
+                    - V-2xlarge
+                    - V-3xlarge
+            patchStrategicMerge:
+              spec:
+                containers:
+                  - (name): "{{ element.name }}"
+                    resources:
+                      requests:
+                        cpu: "{{ cpuReq }}"
+                        memory: "{{ memReq }}"
+                      limits:
+                        cpu: "{{ cpuLim }}"
+                        memory: "{{ memLim }}"
+
+    # Rule 2: Init containers with explicit v2 sizing labels (same logic)
+    - name: v2-init-container-sizing
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              names:
+                - trivy-server
+              namespaces:
+                - security
+          - resources:
+              names:
+                - helper-pod  # local-path provisioner ephemeral helper pods (any namespace)
+      mutate:
+        foreach:
+          - list: "request.object.spec.initContainers || '[]'"
+            context:
+              - name: sizingLabel
+                variable:
+                  value: "{{ request.object.metadata.labels.\"vixens.io/sizing.{{element.name}}\" || 'NONE' }}"
+              - name: cpuReq
+                variable:
+                  value: "{{ sizingLabel == 'V-3xlarge' && '1000m' || sizingLabel == 'G-2xlarge' && '500m' || sizingLabel == 'B-2xlarge' && '500m' || sizingLabel == 'SB-2xlarge' && '500m' || sizingLabel == 'V-2xlarge' && '500m' || sizingLabel == 'G-xlarge' && '200m' || sizingLabel == 'B-xlarge' && '200m' || sizingLabel == 'SB-xlarge' && '200m' || sizingLabel == 'V-xlarge' && '200m' || sizingLabel == 'G-large' && '100m' || sizingLabel == 'B-large' && '100m' || sizingLabel == 'SB-large' && '100m' || sizingLabel == 'V-large' && '100m' || sizingLabel == 'G-medium' && '50m' || sizingLabel == 'B-medium' && '50m' || sizingLabel == 'SB-medium' && '50m' || sizingLabel == 'V-medium' && '50m' || sizingLabel == 'G-small' && '25m' || sizingLabel == 'B-small' && '25m' || sizingLabel == 'SB-small' && '25m' || sizingLabel == 'V-small' && '25m' || sizingLabel == 'G-micro' && '10m' || sizingLabel == 'B-micro' && '10m' || sizingLabel == 'SB-micro' && '10m' || sizingLabel == 'V-micro' && '10m' || sizingLabel == 'G-nano' && '5m' || sizingLabel == 'B-nano' && '5m' || sizingLabel == 'SB-nano' && '5m' || sizingLabel == 'V-nano' && '5m' || '10m' }}"
+              - name: memReq
+                variable:
+                  value: "{{ sizingLabel == 'V-3xlarge' && '8Gi' || sizingLabel == 'G-2xlarge' && '4Gi' || sizingLabel == 'B-2xlarge' && '4Gi' || sizingLabel == 'SB-2xlarge' && '4Gi' || sizingLabel == 'V-2xlarge' && '4Gi' || sizingLabel == 'G-xlarge' && '2Gi' || sizingLabel == 'B-xlarge' && '2Gi' || sizingLabel == 'SB-xlarge' && '2Gi' || sizingLabel == 'V-xlarge' && '2Gi' || sizingLabel == 'G-large' && '1Gi' || sizingLabel == 'B-large' && '1Gi' || sizingLabel == 'SB-large' && '1Gi' || sizingLabel == 'V-large' && '1Gi' || sizingLabel == 'G-medium' && '512Mi' || sizingLabel == 'B-medium' && '512Mi' || sizingLabel == 'SB-medium' && '512Mi' || sizingLabel == 'V-medium' && '512Mi' || sizingLabel == 'G-small' && '256Mi' || sizingLabel == 'B-small' && '256Mi' || sizingLabel == 'SB-small' && '256Mi' || sizingLabel == 'V-small' && '256Mi' || sizingLabel == 'G-micro' && '128Mi' || sizingLabel == 'B-micro' && '128Mi' || sizingLabel == 'SB-micro' && '128Mi' || sizingLabel == 'V-micro' && '128Mi' || sizingLabel == 'G-nano' && '64Mi' || sizingLabel == 'B-nano' && '64Mi' || sizingLabel == 'SB-nano' && '64Mi' || sizingLabel == 'V-nano' && '64Mi' || '128Mi' }}"
+              - name: cpuLim
+                variable:
+                  value: "{{ sizingLabel == 'V-3xlarge' && '4000m' || sizingLabel == 'G-2xlarge' && '500m' || sizingLabel == 'G-xlarge' && '200m' || sizingLabel == 'G-large' && '100m' || sizingLabel == 'G-medium' && '50m' || sizingLabel == 'G-small' && '25m' || sizingLabel == 'G-micro' && '10m' || sizingLabel == 'G-nano' && '5m' || sizingLabel == 'B-2xlarge' && '2000m' || sizingLabel == 'SB-2xlarge' && '2000m' || sizingLabel == 'B-xlarge' && '2000m' || sizingLabel == 'SB-xlarge' && '2000m' || sizingLabel == 'B-large' && '1000m' || sizingLabel == 'SB-large' && '1000m' || sizingLabel == 'B-medium' && '500m' || sizingLabel == 'SB-medium' && '500m' || sizingLabel == 'B-small' && '250m' || sizingLabel == 'SB-small' && '250m' || sizingLabel == 'B-micro' && '100m' || sizingLabel == 'SB-micro' && '100m' || sizingLabel == 'B-nano' && '50m' || sizingLabel == 'SB-nano' && '50m' || sizingLabel == 'V-2xlarge' && '2000m' || sizingLabel == 'V-xlarge' && '800m' || sizingLabel == 'V-large' && '400m' || sizingLabel == 'V-medium' && '200m' || sizingLabel == 'V-small' && '100m' || sizingLabel == 'V-micro' && '40m' || sizingLabel == 'V-nano' && '20m' || '100m' }}"
+              - name: memLim
+                variable:
+                  value: "{{ sizingLabel == 'V-3xlarge' && '32Gi' || sizingLabel == 'G-2xlarge' && '4Gi' || sizingLabel == 'G-xlarge' && '2Gi' || sizingLabel == 'G-large' && '1Gi' || sizingLabel == 'G-medium' && '512Mi' || sizingLabel == 'G-small' && '256Mi' || sizingLabel == 'G-micro' && '128Mi' || sizingLabel == 'G-nano' && '64Mi' || sizingLabel == 'B-2xlarge' && '8Gi' || sizingLabel == 'B-xlarge' && '4Gi' || sizingLabel == 'B-large' && '2Gi' || sizingLabel == 'B-medium' && '1Gi' || sizingLabel == 'B-small' && '512Mi' || sizingLabel == 'B-micro' && '256Mi' || sizingLabel == 'B-nano' && '128Mi' || sizingLabel == 'SB-2xlarge' && '16Gi' || sizingLabel == 'SB-xlarge' && '8Gi' || sizingLabel == 'SB-large' && '4Gi' || sizingLabel == 'SB-medium' && '2Gi' || sizingLabel == 'SB-small' && '1Gi' || sizingLabel == 'SB-micro' && '512Mi' || sizingLabel == 'SB-nano' && '256Mi' || sizingLabel == 'V-2xlarge' && '16Gi' || sizingLabel == 'V-xlarge' && '8Gi' || sizingLabel == 'V-large' && '4Gi' || sizingLabel == 'V-medium' && '2Gi' || sizingLabel == 'V-small' && '1Gi' || sizingLabel == 'V-micro' && '512Mi' || sizingLabel == 'V-nano' && '256Mi' || '512Mi' }}"
+            preconditions:
+              any:
+                - key: "{{ sizingLabel }}"
+                  operator: AnyIn
+                  value:
+                    - G-nano
+                    - G-micro
+                    - G-small
+                    - G-medium
+                    - G-large
+                    - G-xlarge
+                    - G-2xlarge
+                    - B-nano
+                    - B-micro
+                    - B-small
+                    - B-medium
+                    - B-large
+                    - B-xlarge
+                    - B-2xlarge
+                    - SB-nano
+                    - SB-micro
+                    - SB-small
+                    - SB-medium
+                    - SB-large
+                    - SB-xlarge
+                    - SB-2xlarge
+                    - V-nano
+                    - V-micro
+                    - V-small
+                    - V-medium
+                    - V-large
+                    - V-xlarge
+                    - V-2xlarge
+                    - V-3xlarge
+            patchStrategicMerge:
+              spec:
+                initContainers:
+                  - (name): "{{ element.name }}"
+                    resources:
+                      requests:
+                        cpu: "{{ cpuReq }}"
+                        memory: "{{ memReq }}"
+                      limits:
+                        cpu: "{{ cpuLim }}"
+                        memory: "{{ memLim }}"
+
+    # Rule 3: Unlabeled sidecar defaults
+    # Containers without ANY vixens.io/sizing.* label receive baseline sidecar defaults.
+    # VPA (via sizing-vpa-generate.yaml) will then tune these per-pod-per-container.
+    - name: v2-unlabeled-sidecar-defaults
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              names:
+                - trivy-server
+              namespaces:
+                - security
+          - resources:
+              names:
+                - helper-pod  # local-path provisioner ephemeral helper pods (any namespace)
+      mutate:
+        foreach:
+          - list: "request.object.spec.containers || '[]'"
+            preconditions:
+              all:
+                # Only act on containers that have NO v2 sizing label.
+                # Use (labels || `{}`) to handle pods with no labels at all (e.g. local-path helper-pod).
+                - key: "{{ (request.object.metadata.labels || `{}`) | keys(@) | [?@ == 'vixens.io/sizing.{{element.name}}'] | length(@) }}"
+                  operator: Equals
+                  value: "0"
+            patchStrategicMerge:
+              spec:
+                containers:
+                  - (name): "{{ element.name }}"
+                    resources:
+                      requests:
+                        cpu: "10m"
+                        memory: "128Mi"
+                      limits:
+                        cpu: "100m"
+                        memory: "512Mi"

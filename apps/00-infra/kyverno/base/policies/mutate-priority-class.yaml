@@ -1,0 +1,433 @@
+---
+# Kyverno Policy: Mutate Priority Class
+#
+# Injects spec.priorityClassName (and spec.priority) into pods based on a pod label.
+#
+# Generic rule (works for charts that support podLabels):
+#   Add label to pod template:  vixens.io/priority-class: vixens-critical
+#   Kyverno intercepts admission and injects spec.priorityClassName from the label value.
+#
+# Specific rules for charts without podLabels support:
+#   - external-secrets (v0.10.x): match control-plane=controller-manager
+#   - goldilocks (v10.2.x): chart ignores controller/dashboard.podLabels — match on component label
+#   - cert-manager-webhook-gandi (SINTEF v0.5.x): no podLabels/podAnnotations in chart
+#
+# Why patchesJson6902 (not patchStrategicMerge):
+#   patchStrategicMerge on spec.priorityClassName causes Go to include priority: 0 implicitly,
+#   which the PriorityAdmission controller rejects. patchesJson6902 with op: add sets only the
+#   requested field, no side effects.
+#   Exception: for rules that inject priorityClassName via Kyverno mutation (not baked-in chart),
+#   K8s defaults priority: 0 BEFORE the webhook runs. The PriorityAdmission controller then sees
+#   both priority: 0 and priorityClassName → conflict → 403 Forbidden.
+#   Fix: also patch priority: <value> explicitly so it matches the PriorityClass value.
+#
+# Why apiCall for priority value (DRY):
+#   The numeric priority value is read from the PriorityClass object (source of truth).
+#   This keeps rules consistent with _shared/priority-classes/ definitions.
+#   Fallback value (100000) is used if the PriorityClass object exists but has no value field.
+#
+# Why this approach:
+#   In ArgoCD multi-source, kustomize source 2 cannot patch resources rendered by
+#   Helm source 1. This policy makes the injection reproducible from Git.
+#
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: mutate-priority-class
+  annotations:
+    policies.kyverno.io/title: Mutate Priority Class
+    policies.kyverno.io/category: Resource Management
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Injects spec.priorityClassName from pod label vixens.io/priority-class.
+      Also handles charts without podLabels support via specific match rules.
+spec:
+  validationFailureAction: Audit
+  background: false
+  rules:
+     # Rule 1: Generic — inject priorityClassName + priority from pod label vixens.io/priority-class
+     # Uses apiCall to read the numeric value from the PriorityClass object (DRY — source of truth).
+     # Patching spec.priority is required for non-zero classes: K8s sets priority=0 by default before
+     # the webhook runs, causing a conflict with priorityClassName if only the name is patched.
+     # If the apiCall fails (Kyverno not yet ready), failurePolicy:Ignore admits the pod without patch.
+    - name: inject-priority-class-from-label
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      context:
+        - name: priorityClassLabel
+          variable:
+            value: "{{ request.object.metadata.labels.\"vixens.io/priority-class\" || '' }}"
+        - name: priorityValue
+          apiCall:
+            urlPath: "/apis/scheduling.k8s.io/v1/priorityclasses/{{ priorityClassLabel }}"
+            jmesPath: "value || `0`"
+      preconditions:
+        all:
+          - key: "{{ priorityClassLabel }}"
+            operator: NotEquals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /spec/priorityClassName
+            value: "{{ priorityClassLabel }}"
+          - op: add
+            path: /spec/priority
+            value: {{ priorityValue }}
+
+    # Rule 2: external-secrets — chart has no podLabels support
+    # Match on existing chart label: control-plane=controller-manager in external-secrets
+    # Reads priority value from PriorityClass API (DRY — source of truth: _shared/priority-classes/).
+    # If the apiCall HTTP request fails, failurePolicy:Ignore on the Kyverno webhook admits the pod
+    - name: inject-priority-class-external-secrets
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - external-secrets
+              selector:
+                matchLabels:
+                  control-plane: controller-manager
+      context:
+        - name: priorityValue
+          apiCall:
+            urlPath: "/apis/scheduling.k8s.io/v1/priorityclasses/vixens-critical"
+            jmesPath: "value || `100000`"
+      preconditions:
+        all:
+          # Only inject if not already set (idempotent)
+          - key: "{{ request.object.spec.priorityClassName || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /spec/priorityClassName
+            value: "vixens-critical"
+          - op: add
+            path: /spec/priority
+            value: {{ priorityValue }}
+
+    # Rule 3: goldilocks controller — chart (v10.2.x) ignores controller.podLabels
+    # Match on chart-native labels: app.kubernetes.io/name + app.kubernetes.io/component
+    # Reads priority value from PriorityClass API (DRY — source of truth: _shared/priority-classes/).
+    # If the apiCall HTTP request fails, failurePolicy:Ignore on the Kyverno webhook admits the pod
+    - name: inject-priority-class-goldilocks-controller
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - monitoring
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: goldilocks
+                  app.kubernetes.io/component: controller
+      context:
+        - name: priorityValue
+          apiCall:
+            urlPath: "/apis/scheduling.k8s.io/v1/priorityclasses/vixens-critical"
+            jmesPath: "value || `100000`"
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.priorityClassName || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /spec/priorityClassName
+            value: "vixens-critical"
+          - op: add
+            path: /spec/priority
+            value: {{ priorityValue }}
+
+    # Rule 4: goldilocks dashboard — chart (v10.2.x) ignores dashboard.podLabels
+    # vixens-low = value 0 = K8s default → no PriorityAdmission conflict, no need to patch priority.
+    - name: inject-priority-class-goldilocks-dashboard
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - monitoring
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: goldilocks
+                  app.kubernetes.io/component: dashboard
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.priorityClassName || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /spec/priorityClassName
+            value: "vixens-low"
+
+    # Rule 5: goldilocks controller — ReplicaSet pod template (complements Pod rule above)
+    # When Kyverno evaluates the RS pod template against require-priority-class, the RS template
+    # has empty priorityClassName (chart doesn't set it). This mutation pre-populates it so the
+    # RS policyreport shows PASS instead of FAIL, unblocking Platinum promotion.
+    - name: inject-priority-class-goldilocks-controller-rs
+      match:
+        any:
+          - resources:
+              kinds:
+                - ReplicaSet
+              namespaces:
+                - monitoring
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: goldilocks
+                  app.kubernetes.io/component: controller
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.template.spec.priorityClassName || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /spec/template/spec/priorityClassName
+            value: "vixens-critical"
+
+    # Rule 6: goldilocks dashboard — ReplicaSet pod template (complements Pod rule above)
+    - name: inject-priority-class-goldilocks-dashboard-rs
+      match:
+        any:
+          - resources:
+              kinds:
+                - ReplicaSet
+              namespaces:
+                - monitoring
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: goldilocks
+                  app.kubernetes.io/component: dashboard
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.template.spec.priorityClassName || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /spec/template/spec/priorityClassName
+            value: "vixens-low"
+
+    # Rule 7: keda-add-ons-http — Pod injection (chart doesn't support per-component podLabels)
+    # Match on app.kubernetes.io/name=http-add-on in keda namespace
+    - name: inject-priority-class-keda-http-addon
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - keda
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: http-add-on
+      context:
+        - name: priorityValue
+          apiCall:
+            urlPath: "/apis/scheduling.k8s.io/v1/priorityclasses/vixens-medium"
+            jmesPath: "value || `10000`"
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.priorityClassName || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /spec/priorityClassName
+            value: "vixens-medium"
+          - op: add
+            path: /spec/priority
+            value: {{ priorityValue }}
+
+    # Rule 8: keda-add-ons-http — ReplicaSet pod template injection
+    # Pre-populates RS pod template priorityClassName so require-priority-class policyreport passes
+    - name: inject-priority-class-keda-http-addon-rs
+      match:
+        any:
+          - resources:
+              kinds:
+                - ReplicaSet
+              namespaces:
+                - keda
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: http-add-on
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.template.spec.priorityClassName || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /spec/template/spec/priorityClassName
+            value: "vixens-medium"
+
+    # Rule 9: cert-manager-webhook-gandi (SINTEF v0.5.x) — no podLabels/podAnnotations in chart
+
+    # Match on chart-native label: app.kubernetes.io/name in cert-manager namespace
+    # Reads priority value from PriorityClass API (DRY — source of truth: _shared/priority-classes/).
+    # If the apiCall HTTP request fails, failurePolicy:Ignore on the Kyverno webhook admits the pod
+    - name: inject-priority-class-cert-manager-webhook-gandi
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - cert-manager
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: cert-manager-webhook-gandi
+      context:
+        - name: priorityValue
+          apiCall:
+            urlPath: "/apis/scheduling.k8s.io/v1/priorityclasses/vixens-critical"
+            jmesPath: "value || `100000`"
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.priorityClassName || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /spec/priorityClassName
+            value: "vixens-critical"
+          - op: add
+            path: /spec/priority
+            value: {{ priorityValue }}
+
+    # ── Deployment-level rules ────────────────────────────────────────────────
+    # Charts that do not expose priorityClassName in their pod template spec
+    # require injection at Deployment admission, in addition to the Pod/RS rules
+    # above. ArgoCD ignoreDifferences on /spec/template/spec/priorityClassName
+    # prevents drift detection for the affected applications.
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # Rule 10: Generic — Deployments whose pod template carries vixens.io/priority-class
+    # Mirrors Rule 1 logic for Deployment objects. Fixes charts that put the label
+    # in podLabels but don't propagate priorityClassName to the pod template spec
+    # (e.g. jeffresc/it-tools). No apiCall needed: Deployment patches only the
+    # template spec; pods get spec.priority via Rule 1 at Pod admission.
+    - name: inject-priority-class-from-label-deployment
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kyverno
+      context:
+        - name: priorityClassLabel
+          variable:
+            value: "{{ request.object.spec.template.metadata.labels.\"vixens.io/priority-class\" || '' }}"
+      preconditions:
+        all:
+          - key: "{{ priorityClassLabel }}"
+            operator: NotEquals
+            value: ""
+          - key: "{{ request.object.spec.template.spec.priorityClassName || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /spec/template/spec/priorityClassName
+            value: "{{ priorityClassLabel }}"
+
+    # Rule 11: goldilocks-controller Deployment — chart v10.2.x ignores controller.priorityClassName
+    # Complements Pod Rule 3 and RS Rule 5.
+    - name: inject-priority-class-goldilocks-controller-deployment
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              namespaces:
+                - monitoring
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: goldilocks
+                  app.kubernetes.io/component: controller
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.template.spec.priorityClassName || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /spec/template/spec/priorityClassName
+            value: "vixens-critical"
+
+    # Rule 12: goldilocks-dashboard Deployment — chart v10.2.x ignores dashboard.priorityClassName
+    # Complements Pod Rule 4 and RS Rule 6.
+    - name: inject-priority-class-goldilocks-dashboard-deployment
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              namespaces:
+                - monitoring
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: goldilocks
+                  app.kubernetes.io/component: dashboard
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.template.spec.priorityClassName || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /spec/template/spec/priorityClassName
+            value: "vixens-low"
+
+    # Rule 13: keda-add-ons-http Deployments — chart v0.13.x ignores per-component podLabels/priorityClassName
+    # Complements Pod Rule 7 and RS Rule 8.
+    - name: inject-priority-class-keda-http-addon-deployment
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              namespaces:
+                - keda
+              selector:
+                matchLabels:
+                  app.kubernetes.io/name: http-add-on
+      preconditions:
+        all:
+          - key: "{{ request.object.spec.template.spec.priorityClassName || '' }}"
+            operator: Equals
+            value: ""
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: /spec/template/spec/priorityClassName
+            value: "vixens-medium"

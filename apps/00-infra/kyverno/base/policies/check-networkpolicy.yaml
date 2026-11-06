@@ -1,0 +1,68 @@
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: check-networkpolicy
+  annotations:
+    policies.kyverno.io/title: Verify Network Isolation
+    policies.kyverno.io/category: Maturity (Diamond)
+    policies.kyverno.io/description: >-
+      Diamond tier requires proven network isolation. This policy queries the API
+      to ensure a matching NetworkPolicy exists for the pod.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: verify-network-policy-binding
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kyverno
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.app || '' }}"
+            operator: NotEquals
+            value: ""
+      context:
+        - name: netpol_count
+          apiCall:
+            urlPath: "/apis/networking.k8s.io/v1/namespaces/{{request.namespace}}/networkpolicies"
+            jmesPath: "items[?spec.podSelector.matchLabels.app == '{{request.object.metadata.labels.app}}'] | length(@)"
+      validate:
+        message: "No matching NetworkPolicy found for app={{request.object.metadata.labels.app}}. Diamond tier requires explicit network isolation."
+        deny:
+          conditions:
+            all:
+              - key: "{{ netpol_count }}"
+                operator: Equals
+                value: 0
+
+    # Bonus: Mutation du sceau de confiance
+    - name: mutate-network-policy-label
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.labels.app || '' }}"
+            operator: NotEquals
+            value: ""
+      context:
+        - name: has_netpol
+          apiCall:
+            urlPath: "/apis/networking.k8s.io/v1/namespaces/{{request.namespace}}/networkpolicies"
+            jmesPath: "items[?spec.podSelector.matchLabels.app == '{{request.object.metadata.labels.app || 'NO_APP_LABEL'}}'] | length(@)"
+      mutate:
+        patchStrategicMerge:
+          metadata:
+            labels:
+              vixens.io/network-policy: "{{ has_netpol != `0` && 'true' || 'false' }}"
