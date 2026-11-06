@@ -3,6 +3,9 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: argocd
 resources:
+  - apps/fluent-bit.yaml
+  - apps/reloader.yaml
+  - apps/hubble-ui.yaml
   - apps/cert-manager-config.yaml
   - apps/cert-manager.yaml
   - apps/cert-manager-webhook-gandi.yaml
