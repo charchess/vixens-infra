@@ -3,6 +3,9 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: argocd
 resources:
+  - apps/postgresql-shared.yaml
+  - apps/mosquitto.yaml
+  - apps/loki.yaml
   - apps/authentik.yaml
   - apps/redis-shared.yaml
   - apps/renovate.yaml
