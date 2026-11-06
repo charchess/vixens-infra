@@ -8,6 +8,7 @@ resources:
   - apps/mail-gateway.yaml
   - apps/traefik-dashboard.yaml
   - apps/priority-classes.yaml
+  - apps/cert-manager-secrets.yaml
   - apps/whoami.yaml
   - apps/snmp-exporter.yaml
   - apps/grafana-ingress.yaml
