@@ -1,0 +1,136 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  # Private sealed POC; prod-stable promotion remains human approved.
+  - ../../openbao-fabric/overlays/prod
+  - ../../operator/config/rbac
+  - ../../operator/config/network
+  # Platform-only read credential; no tenant secrets and no rollout flag change.
+  - ../../operator/config/iam
+  - ../../operator/config/profiles
+  - ../../operator/config/manager
+  - ../../gateway
+  # Centralized Fabric relational authorization (one service for all tenants)
+  - ../../openfga/runtime
+  # BFF private, browser auth OFF; bootstrap DB/credentials is NOT activated.
+  - ../../webui
+  - ../../tenants/indiba
+  - ../../tenants/hairem
+  - ../../tenants/hairem-sandbox
+  - ../../tenants/fabric-smoke
+
+# Phase 2b activates the authoritative operator after phase 2a proved that the
+# legacy control objects could be pruned without affecting the running sandbox.
+# Sync waves make the transition deterministic: API first, operator foundation
+# second, manager third, and tenant intent last.
+patches:
+  - target:
+      group: apiextensions.k8s.io
+      version: v1
+      kind: CustomResourceDefinition
+    patch: |-
+      - op: add
+        path: /metadata/annotations/argocd.argoproj.io~1sync-wave
+        value: "-30"
+  - target:
+      version: v1
+      kind: Namespace
+      name: txo-fabric-system
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          argocd.argoproj.io/sync-wave: "-20"
+  - target:
+      group: rbac.authorization.k8s.io
+      version: v1
+      kind: ClusterRole
+      name: txo-fabric-operator
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          argocd.argoproj.io/sync-wave: "-10"
+  - target:
+      group: rbac.authorization.k8s.io
+      version: v1
+      kind: ClusterRoleBinding
+      name: txo-fabric-operator
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          argocd.argoproj.io/sync-wave: "-10"
+  - target:
+      version: v1
+      kind: ServiceAccount
+      name: txo-fabric-operator
+      namespace: txo-fabric-system
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          argocd.argoproj.io/sync-wave: "-10"
+  - target:
+      group: networking.k8s.io
+      version: v1
+      kind: NetworkPolicy
+      name: default-deny
+      namespace: txo-fabric-system
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          argocd.argoproj.io/sync-wave: "-10"
+  - target:
+      group: networking.k8s.io
+      version: v1
+      kind: NetworkPolicy
+      name: txo-fabric-operator-egress
+      namespace: txo-fabric-system
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          argocd.argoproj.io/sync-wave: "-10"
+  - target:
+      group: fabric.truxonline.io
+      version: v1alpha1
+      kind: AgentRuntimeProfile
+      name: hermes-default
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          argocd.argoproj.io/sync-wave: "-10"
+  - target:
+      group: fabric.truxonline.io
+      version: v1alpha1
+      kind: PostgreSQLProfile
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          argocd.argoproj.io/sync-wave: "-10"
+  - target:
+      group: fabric.truxonline.io
+      version: v1alpha1
+      kind: HindsightProfile
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          argocd.argoproj.io/sync-wave: "-10"
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: txo-fabric-operator
+      namespace: txo-fabric-system
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          argocd.argoproj.io/sync-wave: "-5"

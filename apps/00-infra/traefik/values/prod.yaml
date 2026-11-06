@@ -1,0 +1,63 @@
+---
+# Production environment overrides for Traefik
+# VLAN 201 (192.168.201.0/24)
+
+# ============================================================================
+# LoadBalancer Service Configuration
+# ============================================================================
+service:
+  type: LoadBalancer
+  annotations:
+    io.cilium/lb-ipam-ips: 192.168.201.70
+  spec:
+    externalTrafficPolicy: Cluster
+# ============================================================================
+# Production-Specific Settings
+# ============================================================================
+# Log level for production (less verbose)
+logs:
+  general:
+    level: WARN
+  access:
+    enabled: true
+resources: {}
+# High availability with multiple replicas
+# CrowdSec remains independently deployed, but it is not a global Traefik
+# entrypoint dependency: an unavailable LAPI must not take down public routing.
+additionalArguments: []
+
+deployment:
+  replicas: 2
+  podLabels:
+    app: traefik
+    app.kubernetes.io/name: traefik
+    vixens.io/sizing.traefik: V-medium
+  podAnnotations:
+    kubectl.kubernetes.io/restartedAt: "2026-03-12T04:35:00Z"
+# Ensure traefik pods spread across nodes
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: traefik
+# ============================================================================
+# Production Metrics & Monitoring
+# ============================================================================
+metrics:
+  prometheus:
+    enabled: true
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    addRoutersLabels: true
+    serviceMonitor:
+      enabled: true
+      namespace: traefik
+      interval: 60s
+# ============================================================================
+# Production Pod Disruption Budget
+# ============================================================================
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

@@ -1,0 +1,1006 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: tenantbundles.fabric.truxonline.io
+spec:
+  group: fabric.truxonline.io
+  names:
+    categories:
+    - txo-fabric
+    kind: TenantBundle
+    listKind: TenantBundleList
+    plural: tenantbundles
+    shortNames:
+    - tbundle
+    singular: tenantbundle
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.tenantId
+      name: Tenant
+      type: string
+    - jsonPath: .status.namespace
+      name: Namespace
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: TenantBundleSpec is the desired state of one Fabric Cell.
+            properties:
+              agentPopulation:
+                description: |-
+                  AgentPopulation declares creation-only generated AgentIdentity resources.
+                  Existing identities are never adopted, updated or deleted by this field.
+                items:
+                  description: |-
+                    TenantAgentPopulationEntry declares one stable generated AgentIdentity.
+                    It intentionally excludes tenantRef and metadata: the parent TenantBundle
+                    supplies the tenant boundary and generated identity name.
+                  properties:
+                    access:
+                      description: |-
+                        AgentAccessSpec binds an agent to tenant workspace populations. A future IAM
+                        integration may manage these bindings; Fabric does not become the employee directory.
+                      properties:
+                        chatIAMGroups:
+                          description: |-
+                            ChatIAMGroups is an explicit agent.chat access intent referencing only
+                            TenantBundle.humanAccess.web.iamGroups keys, NOT workspace group keys.
+                            Authentik live membership, immutable UUID→Fabric ledger, and tenant
+                            group-UUID pins are separately verified before any tuple is written.
+                            Omitted/empty never implies an agent.chat permission.
+                          items:
+                            type: string
+                          maxItems: 32
+                          type: array
+                          x-kubernetes-list-type: set
+                        groups:
+                          description: Groups selects declared tenant group workspace
+                            scopes.
+                          items:
+                            type: string
+                          maxItems: 32
+                          type: array
+                          x-kubernetes-list-type: set
+                        userRef:
+                          description: UserRef selects one declared tenant user workspace
+                            scope.
+                          maxLength: 32
+                          pattern: ^$|^[a-z0-9]([a-z0-9-]*[a-z0-9])?$
+                          type: string
+                      type: object
+                    agentKey:
+                      description: AgentKey is the immutable tenant-local machine
+                        identifier.
+                      maxLength: 63
+                      minLength: 1
+                      pattern: ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$
+                      type: string
+                    displayName:
+                      description: DisplayName is the user-facing identity name.
+                      maxLength: 128
+                      minLength: 1
+                      type: string
+                    existingIdentityName:
+                      description: |-
+                        ExistingIdentityName explicitly references a pre-existing brownfield
+                        AgentIdentity. When set, reconciliation validates it read-only instead
+                        of creating or adopting it. This reference is immutable once declared.
+                      maxLength: 253
+                      type: string
+                    expectedMemoryBankId:
+                      description: |-
+                        ExpectedMemoryBankID is the observed bank binding required for a
+                        brownfield identity. It prevents silently connecting a different memory.
+                        Required when existingIdentityName is set.
+                      maxLength: 128
+                      type: string
+                    humanAccess:
+                      properties:
+                        enabled:
+                          description: |-
+                            Enabled opts this stable AgentIdentity into the tenant's configured human
+                            entry transport. Transport/OIDC details stay tenant-owned so AgentIdentity
+                            remains channel-neutral.
+                          type: boolean
+                      type: object
+                    memory:
+                      properties:
+                        bankId:
+                          description: |-
+                            BankID optionally pins a logical bank identifier. When omitted the operator resolves
+                            <tenant-name>-<agent-key> and records the result in status.memory.bankId.
+                          maxLength: 128
+                          minLength: 2
+                          pattern: ^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$
+                          type: string
+                      type: object
+                    runtime:
+                      properties:
+                        capabilities:
+                          description: Capabilities selects only profile-declared
+                            AllowedOff capabilities.
+                          properties:
+                            enableToolsets:
+                              description: |-
+                                EnableToolsets activates profile entries whose state is AllowedOff.
+                                On entries require no opt-in; Off or undeclared entries cannot be requested.
+                              items:
+                                type: string
+                              maxItems: 64
+                              type: array
+                              x-kubernetes-list-type: set
+                          type: object
+                        privateAPI:
+                          description: |-
+                            PrivateAPI is an opt-in for an operator-owned private Responses Service and
+                            BFF-only ingress NetworkPolicy. It does not launch a listener, expose a
+                            credential, or mark endpoint readiness; omission preserves legacy behavior.
+                          properties:
+                            credentialRef:
+                              description: |-
+                                CredentialRef is a NON-SECRET reference name, not a secret or token.
+                                When set, it must equal hermes-api-<canonical agentKey>; omission derives that canonical name. Never read/mounted here.
+                              maxLength: 63
+                              pattern: ^hermes-api-[a-z0-9]([a-z0-9-]*[a-z0-9])?$
+                              type: string
+                              x-kubernetes-validations:
+                              - message: credentialRef is immutable
+                                rule: self == oldSelf
+                            enabled:
+                              default: false
+                              description: Enabled is desired future intent, NOT activation.
+                                Omitted/false is safe.
+                              type: boolean
+                            tenantId:
+                              description: TenantID is the immutable TenantBundle.spec.tenantId,
+                                not its slug.
+                              maxLength: 64
+                              pattern: ^TEN[0-9]{5,}$
+                              type: string
+                              x-kubernetes-validations:
+                              - message: tenantId is immutable
+                                rule: self == oldSelf
+                          type: object
+                          x-kubernetes-validations:
+                          - message: enabled private API requires canonical tenantId
+                            rule: '!has(self.enabled) || !self.enabled || (has(self.tenantId)
+                              && size(self.tenantId) > 0)'
+                        profileRef:
+                          default: hermes-default
+                          description: ProfileRef references an AgentRuntimeProfile
+                            by metadata.name.
+                          maxLength: 128
+                          minLength: 1
+                          type: string
+                        storage:
+                          description: Storage defines lifecycle intent for the identity's
+                            runtime workspace.
+                          properties:
+                            adoptLegacyProfile:
+                              description: |-
+                                AdoptLegacyProfile is a deprecated, stored-CR compatibility sentinel.
+                                True is rejected by the current reconciler before PVC/deployment mutation:
+                                removing it from an existing CR could silently substitute a different
+                                runtime home. Keep this API field readable until old CRs have received
+                                an explicitly reviewed data transition; new tenants must leave it unset.
+                              type: boolean
+                            retentionPolicy:
+                              default: Retain
+                              description: |-
+                                RetentionPolicy controls what happens to the Hermes runtime PVC when the
+                                AgentIdentity is deleted. Retain is the safe default for durable customer
+                                workspaces; Delete is an explicit opt-in for disposable identities.
+                              enum:
+                              - Retain
+                              - Delete
+                              type: string
+                              x-kubernetes-validations:
+                              - message: retentionPolicy is immutable
+                                rule: self == oldSelf
+                          type: object
+                          x-kubernetes-validations:
+                          - message: adoptLegacyProfile requires retentionPolicy Retain
+                            rule: '!has(self.adoptLegacyProfile) || !self.adoptLegacyProfile
+                              || self.retentionPolicy == ''Retain'''
+                          - message: adoptLegacyProfile cannot be changed once declared
+                            rule: '!has(oldSelf.adoptLegacyProfile) || (has(self.adoptLegacyProfile)
+                              && self.adoptLegacyProfile == oldSelf.adoptLegacyProfile)'
+                      type: object
+                  required:
+                  - agentKey
+                  - displayName
+                  type: object
+                maxItems: 64
+                type: array
+                x-kubernetes-list-map-keys:
+                - agentKey
+                x-kubernetes-list-type: map
+              agentStorage:
+                description: |-
+                  AgentStorage selects durable/disposable agent private PVC storage classes.
+                  It is independent of AgentRuntimeProfile and therefore Hermes releases.
+                  Omitted only for backwards compatibility with legacy tenant declarations.
+                properties:
+                  disposableStorageClassName:
+                    description: |-
+                      DisposableStorageClassName is used only by identities explicitly
+                      opting into retentionPolicy Delete.
+                    maxLength: 253
+                    minLength: 1
+                    type: string
+                  retainedStorageClassName:
+                    description: |-
+                      RetainedStorageClassName must provision PVs with reclaimPolicy Retain
+                      for newly created durable agent workspaces.
+                    maxLength: 253
+                    minLength: 1
+                    type: string
+                required:
+                - disposableStorageClassName
+                - retainedStorageClassName
+                type: object
+              aiCredentialBroker:
+                description: |-
+                  AICredentialBroker is a deprecated v1alpha1 compatibility/profile-override
+                  field. Presence no longer enables CPA: every Active tenant receives the
+                  tenant-local credential broker automatically. Nil selects the platform default.
+                properties:
+                  profileRef:
+                    default: cliproxyapi-standard
+                    description: ProfileRef selects the tenant-local OAuth/subscription
+                      credential broker profile.
+                    maxLength: 128
+                    type: string
+                type: object
+              aiGateway:
+                description: |-
+                  AIGateway is a deprecated v1alpha1 compatibility/profile-override field.
+                  Presence no longer enables the gateway: every Active tenant receives the
+                  tenant LiteLLM facade automatically. Nil selects the platform default profile.
+                  Provider/OAuth credentials never appear in this CR.
+                properties:
+                  migrationRecovery:
+                    description: |-
+                      MigrationRecovery is a reviewed, immutable-until-retired recovery identifier for a
+                      legacy failed migration whose retained Job evidence was lost before the
+                      UID-bound status contract existed. It permits exactly attempt 1, never
+                      resets an existing attempt history, and is not a recurring operation.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$
+                    type: string
+                  migrationRecoveryFailedGeneration:
+                    description: |-
+                      MigrationRecoveryFailedGeneration binds MigrationRecovery to the exact
+                      historical TenantBundle generation which recorded MigrationFailed. It is
+                      immutable, so later unrelated spec changes cannot replay the transition.
+                    format: int64
+                    minimum: 1
+                    type: integer
+                  migrationRecoveryTransitions:
+                    description: |-
+                      MigrationRecoveryTransitions are reviewed, immutable-until-retired recovery admissions
+                      for a specific retained EvidenceMissing migration record. Entries are
+                      append-only: each request names the tenant, exact prior attempt and UID,
+                      and one unique identifier; it cannot repair or replace historical status.
+                    items:
+                      description: |-
+                        AIGatewayMigrationRecoveryTransition admits one successor to an exact
+                        historical EvidenceMissing record. All values are declarative review inputs;
+                        the controller validates them against the TenantBundle and records its own
+                        owner/UID-bound consumption marker before creating the successor Job.
+                      properties:
+                        expectedAttempt:
+                          description: ExpectedAttempt identifies the retained EvidenceMissing
+                            record.
+                          format: int32
+                          minimum: 0
+                          type: integer
+                        expectedJobUID:
+                          description: ExpectedJobUID binds the request to the historical
+                            Job identity.
+                          maxLength: 253
+                          minLength: 1
+                          type: string
+                        id:
+                          description: ID is a unique immutable recovery identifier
+                            within this TenantBundle.
+                          maxLength: 63
+                          minLength: 1
+                          pattern: ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$
+                          type: string
+                        tenantId:
+                          description: TenantID must equal the containing TenantBundle
+                            spec.tenantId.
+                          maxLength: 253
+                          minLength: 1
+                          type: string
+                      required:
+                      - expectedAttempt
+                      - expectedJobUID
+                      - id
+                      - tenantId
+                      type: object
+                    maxItems: 16
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - id
+                    x-kubernetes-list-type: map
+                  migrationRetry:
+                    default: 0
+                    description: |-
+                      MigrationRetry is the reviewed migration attempt ordinal. Attempt zero is
+                      created for a new tenant. A later value is accepted only as the next
+                      ordinal after a retained failed attempt; profile or configuration changes
+                      never create another migration Job.
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  profileRef:
+                    default: litellm-standard
+                    description: ProfileRef selects the tenant-facing LiteLLM gateway
+                      profile.
+                    maxLength: 128
+                    type: string
+                type: object
+                x-kubernetes-validations:
+                - message: migrationRecovery is immutable except for full retirement
+                    with migrationRetry zero
+                  rule: '!has(oldSelf.migrationRecovery) || (has(self.migrationRecovery)
+                    && self.migrationRecovery == oldSelf.migrationRecovery) || (!has(self.migrationRecovery)
+                    && !has(self.migrationRecoveryFailedGeneration) && !has(self.migrationRecoveryTransitions)
+                    && (!has(self.migrationRetry) || self.migrationRetry == 0))'
+                - message: migrationRecoveryFailedGeneration is immutable except for
+                    full retirement
+                  rule: '!has(oldSelf.migrationRecoveryFailedGeneration) || (has(self.migrationRecoveryFailedGeneration)
+                    && self.migrationRecoveryFailedGeneration == oldSelf.migrationRecoveryFailedGeneration)
+                    || (!has(self.migrationRecovery) && !has(self.migrationRecoveryFailedGeneration)
+                    && !has(self.migrationRecoveryTransitions) && (!has(self.migrationRetry)
+                    || self.migrationRetry == 0))'
+                - message: migrationRecovery and migrationRecoveryFailedGeneration
+                    must be declared together
+                  rule: has(self.migrationRecovery) == has(self.migrationRecoveryFailedGeneration)
+                - message: migrationRecoveryTransitions is append-only except for
+                    full retirement
+                  rule: '!has(oldSelf.migrationRecoveryTransitions) || (has(self.migrationRecoveryTransitions)
+                    && self.migrationRecoveryTransitions.size() >= oldSelf.migrationRecoveryTransitions.size()
+                    && oldSelf.migrationRecoveryTransitions.all(old, self.migrationRecoveryTransitions.exists(current,
+                    current == old))) || (!has(self.migrationRecovery) && !has(self.migrationRecoveryFailedGeneration)
+                    && !has(self.migrationRecoveryTransitions) && (!has(self.migrationRetry)
+                    || self.migrationRetry == 0))'
+              displayName:
+                description: DisplayName is the human-readable tenant name.
+                maxLength: 253
+                minLength: 1
+                type: string
+              humanAccess:
+                description: |-
+                  HumanAccess declares tenant-owned IAM/transport policy for authenticated
+                  human interaction with explicitly opted-in AgentIdentity resources.
+                properties:
+                  web:
+                    description: |-
+                      Web configures the first v0 human transport. Additional channels belong
+                      beside Web rather than inside AgentIdentity.
+                    properties:
+                      dnsTarget:
+                        description: DNSTarget optionally requests a CNAME-style target
+                          from external-dns.
+                        maxLength: 253
+                        type: string
+                      domainSuffix:
+                        description: |-
+                          DomainSuffix is the platform-managed DNS suffix. Runtime hosts are derived
+                          as <agentKey>-<tenantName>.<domainSuffix>.
+                        maxLength: 253
+                        minLength: 3
+                        type: string
+                      iamGroups:
+                        description: |-
+                          IAMGroups are tenant-local structural IAM group keys authorized to enter
+                          Fabric human-facing surfaces. Fabric reconciles the corresponding Authentik
+                          groups but never manages human membership in them.
+                        items:
+                          type: string
+                        maxItems: 32
+                        minItems: 1
+                        type: array
+                        x-kubernetes-list-type: set
+                      ingressClassName:
+                        default: traefik
+                        description: IngressClassName selects the platform ingress
+                          implementation.
+                        maxLength: 63
+                        minLength: 1
+                        type: string
+                      oidc:
+                        properties:
+                          clientId:
+                            description: |-
+                              ClientID is a public PKCE client identifier. Client secrets are not part
+                              of the Fabric CRD contract.
+                            maxLength: 253
+                            minLength: 1
+                            type: string
+                          issuer:
+                            description: |-
+                              Issuer is the HTTPS OpenID Connect issuer used by the runtime dashboard.
+                              Runtime validation also enforces an HTTPS issuer before exposure.
+                            maxLength: 2048
+                            minLength: 8
+                            type: string
+                          scopes:
+                            default: openid profile email
+                            description: Scopes defaults to the identity claims required
+                              by Hermes.
+                            maxLength: 512
+                            type: string
+                        required:
+                        - clientId
+                        - issuer
+                        type: object
+                      publicDNS:
+                        description: |-
+                          PublicDNS opts generated agent Ingresses into the platform public-DNS
+                          controller. Internal split DNS still follows the Ingress host normally.
+                        type: boolean
+                      tlsClusterIssuer:
+                        description: TLSClusterIssuer selects the cert-manager ClusterIssuer
+                          for per-agent TLS.
+                        maxLength: 253
+                        minLength: 1
+                        type: string
+                    required:
+                    - domainSuffix
+                    - oidc
+                    - tlsClusterIssuer
+                    type: object
+                type: object
+              isolation:
+                properties:
+                  profile:
+                    default: Shared
+                    description: Profile selects the isolation policy for the tenant
+                      cell.
+                    enum:
+                    - Shared
+                    - Dedicated
+                    type: string
+                type: object
+              lifecycle:
+                description: |-
+                  Lifecycle controls whether the tenant runs steady-state Fabric compute.
+                  It does not select an AI-plane implementation: every Active tenant receives
+                  the same tenant-local LiteLLM + CPA topology.
+                properties:
+                  mode:
+                    default: Active
+                    description: |-
+                      Mode controls the lifecycle of the mandatory tenant AI plane.
+                      Active is the default and receives the canonical tenant AI plane.
+                      Parked preserves the recovery shell and durable AI-plane state without
+                      running tenant LiteLLM/CPA compute. Optional capabilities keep their own
+                      declaration/lifecycle contracts.
+                    enum:
+                    - Active
+                    - Parked
+                    type: string
+                type: object
+              memory:
+                description: Memory declares the durable memory capability consumed
+                  by AgentIdentity resources.
+                properties:
+                  hindsight:
+                    description: Hindsight enables tenant-scoped durable agent memory
+                      through Hindsight.
+                    properties:
+                      humanAccess:
+                        default: false
+                        description: |-
+                          HumanAccess opts this tenant into the authenticated Hindsight Control Plane
+                          WebUI using TenantBundle.spec.humanAccess.web for DNS/TLS/ingress policy.
+                        type: boolean
+                      profileRef:
+                        description: ProfileRef selects the Hindsight service profile
+                          owned by TXO Fabric.
+                        maxLength: 128
+                        type: string
+                    type: object
+                type: object
+              modules:
+                description: |-
+                  Modules contains optional tenant capabilities. Core runtime, persistence and memory are
+                  explicit fields because other resources depend on their resolved status.
+                items:
+                  properties:
+                    enabled:
+                      default: true
+                      description: Enabled defaults to true when the module entry
+                        is present.
+                      type: boolean
+                    name:
+                      description: Name is the stable Fabric module key (for example
+                        paperclip or valkey).
+                      maxLength: 63
+                      minLength: 1
+                      pattern: ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$
+                      type: string
+                    profileRef:
+                      description: ProfileRef selects a platform-owned implementation
+                        profile for the module.
+                      maxLength: 128
+                      type: string
+                  required:
+                  - name
+                  type: object
+                maxItems: 64
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
+              persistence:
+                properties:
+                  postgresql:
+                    description: PostgreSQL requests PostgreSQL capability for this
+                      tenant. Nil means no PostgreSQL dependency.
+                    properties:
+                      mode:
+                        default: Shared
+                        description: Mode selects logical resources on the platform
+                          shared cluster or a tenant-dedicated cluster.
+                        enum:
+                        - Shared
+                        - Dedicated
+                        type: string
+                      profileRef:
+                        description: |-
+                          ProfileRef selects a platform-owned database profile. The profile implementation is intentionally
+                          outside TenantBundle so tenants do not embed infrastructure credentials or topology.
+                        maxLength: 128
+                        type: string
+                    type: object
+                type: object
+              tenantId:
+                description: |-
+                  TenantID is the immutable business identifier. Kubernetes metadata.name is the canonical
+                  machine slug and is used to derive tenant-<name> namespaces.
+                pattern: ^TEN[0-9]{5,}$
+                type: string
+                x-kubernetes-validations:
+                - message: tenantId is immutable
+                  rule: self == oldSelf
+              workspace:
+                description: |-
+                  Workspace declares tenant-owned shared business-data scopes. It is independent
+                  from every AgentIdentity private /opt/data workspace.
+                properties:
+                  groups:
+                    description: Groups declares team file and skill-library scopes
+                      that can be bound to agents.
+                    items:
+                      description: NamedWorkspaceScopeSpec defines a group or user
+                        scope available in one tenant.
+                      properties:
+                        collaborative:
+                          type: boolean
+                        name:
+                          description: Name is the stable scope key used in paths
+                            and agent bindings.
+                          maxLength: 32
+                          minLength: 1
+                          pattern: ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$
+                          type: string
+                        reference:
+                          type: boolean
+                        skillsCollaborative:
+                          type: boolean
+                        skillsReference:
+                          type: boolean
+                      required:
+                      - name
+                      type: object
+                      x-kubernetes-validations:
+                      - message: workspace scope must enable file or skill access
+                        rule: self.reference || self.collaborative || self.skillsReference
+                          || self.skillsCollaborative
+                    maxItems: 64
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                  organization:
+                    description: Organization declares tenant-wide file and skill-library
+                      scopes.
+                    properties:
+                      collaborative:
+                        description: Collaborative exposes a writable business exchange/collaboration
+                          area.
+                        type: boolean
+                      reference:
+                        description: Reference exposes authoritative business material
+                          read-only to the agent runtime.
+                        type: boolean
+                      skillsCollaborative:
+                        description: |-
+                          SkillsCollaborative exposes a shared skill library writable by authorized agents,
+                          allowing deliberate cross-agent skill sharing and improvement.
+                        type: boolean
+                      skillsReference:
+                        description: |-
+                          SkillsReference exposes a shared skill library read-only to Hermes. Agent-local
+                          skills under /opt/data remain private and writable.
+                        type: boolean
+                    type: object
+                  profileRef:
+                    description: ProfileRef selects platform-owned RWX storage implementation
+                      policy.
+                    maxLength: 128
+                    minLength: 1
+                    type: string
+                  retentionPolicy:
+                    default: Retain
+                    description: |-
+                      RetentionPolicy controls tenant teardown. Retain is the safe default.
+                      Changing destructive intent after storage exists would make teardown behavior
+                      ambiguous, so it is immutable just like the private AgentIdentity workspace.
+                    enum:
+                    - Retain
+                    - Delete
+                    type: string
+                    x-kubernetes-validations:
+                    - message: retentionPolicy is immutable
+                      rule: self == oldSelf
+                  users:
+                    description: Users declares human/user file and skill-library
+                      scopes that can be bound to agents.
+                    items:
+                      description: NamedWorkspaceScopeSpec defines a group or user
+                        scope available in one tenant.
+                      properties:
+                        collaborative:
+                          type: boolean
+                        name:
+                          description: Name is the stable scope key used in paths
+                            and agent bindings.
+                          maxLength: 32
+                          minLength: 1
+                          pattern: ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$
+                          type: string
+                        reference:
+                          type: boolean
+                        skillsCollaborative:
+                          type: boolean
+                        skillsReference:
+                          type: boolean
+                      required:
+                      - name
+                      type: object
+                      x-kubernetes-validations:
+                      - message: workspace scope must enable file or skill access
+                        rule: self.reference || self.collaborative || self.skillsReference
+                          || self.skillsCollaborative
+                    maxItems: 256
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                required:
+                - profileRef
+                type: object
+            required:
+            - displayName
+            - tenantId
+            type: object
+          status:
+            description: TenantBundleStatus is the observed state of a Fabric Cell.
+            properties:
+              aiCredentialBroker:
+                properties:
+                  endpoint:
+                    description: Endpoint is the resolved in-cluster endpoint, when
+                      the component exposes one.
+                    type: string
+                  humanEndpoint:
+                    description: |-
+                      HumanEndpoint is the stable authenticated human-facing endpoint when the
+                      component exposes an operator/admin WebUI.
+                    type: string
+                  message:
+                    description: Message contains a human-readable explanation for
+                      non-ready states.
+                    type: string
+                  phase:
+                    description: Phase is a concise machine-readable lifecycle state.
+                    type: string
+                type: object
+              aiGateway:
+                properties:
+                  endpoint:
+                    description: Endpoint is the resolved in-cluster endpoint, when
+                      the component exposes one.
+                    type: string
+                  humanEndpoint:
+                    description: |-
+                      HumanEndpoint is the stable authenticated human-facing endpoint when the
+                      component exposes an operator/admin WebUI.
+                    type: string
+                  message:
+                    description: Message contains a human-readable explanation for
+                      non-ready states.
+                    type: string
+                  phase:
+                    description: Phase is a concise machine-readable lifecycle state.
+                    type: string
+                type: object
+              aiGatewayMigration:
+                description: |-
+                  AIGatewayMigration retains UID-bound evidence for every LiteLLM schema
+                  migration attempt. Entries are appended by attempt ordinal and retained
+                  across active reconciliation, parking and cleanup.
+                items:
+                  description: |-
+                    AIGatewayMigrationStatus is durable, UID-bound evidence for one migration
+                    attempt. Records are appended for new attempts and never replaced by a
+                    different Job identity.
+                  properties:
+                    attempt:
+                      description: Attempt is the monotonically increasing migration
+                        attempt ordinal.
+                      format: int32
+                      type: integer
+                    jobName:
+                      description: JobName is the immutable name of the Job created
+                        for this attempt.
+                      type: string
+                    jobUID:
+                      description: JobUID binds the evidence to one Kubernetes Job
+                        instance.
+                      type: string
+                    phase:
+                      description: Phase is observed from the bound Job's terminal
+                        conditions only.
+                      enum:
+                      - Pending
+                      - Succeeded
+                      - Failed
+                      - EvidenceMissing
+                      type: string
+                  required:
+                  - attempt
+                  - jobName
+                  - jobUID
+                  - phase
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - attempt
+                x-kubernetes-list-type: map
+              conditions:
+                description: Conditions use the standard Kubernetes condition shape.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              memory:
+                properties:
+                  hindsight:
+                    properties:
+                      endpoint:
+                        description: Endpoint is the resolved in-cluster endpoint,
+                          when the component exposes one.
+                        type: string
+                      humanEndpoint:
+                        description: |-
+                          HumanEndpoint is the stable authenticated human-facing endpoint when the
+                          component exposes an operator/admin WebUI.
+                        type: string
+                      message:
+                        description: Message contains a human-readable explanation
+                          for non-ready states.
+                        type: string
+                      phase:
+                        description: Phase is a concise machine-readable lifecycle
+                          state.
+                        type: string
+                    type: object
+                type: object
+              modules:
+                items:
+                  properties:
+                    endpoint:
+                      description: Endpoint is the resolved in-cluster endpoint, when
+                        the component exposes one.
+                      type: string
+                    humanEndpoint:
+                      description: |-
+                        HumanEndpoint is the stable authenticated human-facing endpoint when the
+                        component exposes an operator/admin WebUI.
+                      type: string
+                    message:
+                      description: Message contains a human-readable explanation for
+                        non-ready states.
+                      type: string
+                    name:
+                      type: string
+                    phase:
+                      description: Phase is a concise machine-readable lifecycle state.
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
+              namespace:
+                description: Namespace is the resolved tenant namespace.
+                maxLength: 63
+                type: string
+              observedGeneration:
+                format: int64
+                type: integer
+              persistence:
+                properties:
+                  postgresql:
+                    properties:
+                      endpoint:
+                        description: Endpoint is the resolved in-cluster endpoint,
+                          when the component exposes one.
+                        type: string
+                      humanEndpoint:
+                        description: |-
+                          HumanEndpoint is the stable authenticated human-facing endpoint when the
+                          component exposes an operator/admin WebUI.
+                        type: string
+                      message:
+                        description: Message contains a human-readable explanation
+                          for non-ready states.
+                        type: string
+                      phase:
+                        description: Phase is a concise machine-readable lifecycle
+                          state.
+                        type: string
+                    type: object
+                type: object
+              phase:
+                enum:
+                - Pending
+                - Provisioning
+                - Ready
+                - Parked
+                - Degraded
+                - Failed
+                - Deleting
+                type: string
+              workspaceMigration:
+                description: WorkspaceMigration retains UID-bound evidence for completed
+                  shared workspace copies.
+                items:
+                  properties:
+                    evidenceSource:
+                      type: string
+                    jobName:
+                      type: string
+                    jobUID:
+                      type: string
+                    phase:
+                      description: WorkspaceMigrationPhase is the durable evidence
+                        phase for one shared workspace copy.
+                      enum:
+                      - Pending
+                      - Succeeded
+                      - LegacyRecovered
+                      - Failed
+                      - EvidenceMissing
+                      - EvidenceConflict
+                      type: string
+                    sourceClaimName:
+                      type: string
+                    sourcePVCUID:
+                      type: string
+                    targetClaimName:
+                      type: string
+                    targetPVCUID:
+                      type: string
+                    verificationResult:
+                      type: string
+                  required:
+                  - phase
+                  - sourceClaimName
+                  - sourcePVCUID
+                  - targetClaimName
+                  - targetPVCUID
+                  - verificationResult
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - sourceClaimName
+                x-kubernetes-list-type: map
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

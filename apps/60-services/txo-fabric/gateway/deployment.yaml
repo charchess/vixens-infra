@@ -1,0 +1,100 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: txo-ai-gateway
+  namespace: txo-fabric-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  labels:
+    app.kubernetes.io/name: txo-ai-gateway
+    app.kubernetes.io/part-of: txo-fabric
+    app.kubernetes.io/component: ai-egress
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: txo-ai-gateway
+  template:
+    metadata:
+      annotations:
+        # LiteLLM cold start is CPU-bound; keep VPA from throttling startup below the
+        # deployment's proven 250m baseline while still allowing VPA to scale upward.
+        vixens.io/vpa.min-cpu: "250m"
+        # Keep the documented baseline schedulable; use VPA recommendations manually.
+        vixens.io/vpa.update-mode: "Off"
+      labels:
+        app.kubernetes.io/name: txo-ai-gateway
+        app.kubernetes.io/part-of: txo-fabric
+        app.kubernetes.io/component: ai-egress
+        vixens.io/sizing.litellm: V-scout
+    spec:
+      automountServiceAccountToken: false
+      priorityClassName: vixens-medium
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: litellm
+          image: ghcr.io/berriai/litellm-non_root:v1.102.1
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              export DATABASE_URL="$(python -c 'import os, urllib.parse; u=urllib.parse.quote(os.environ["DB_USERNAME"], safe=""); p=urllib.parse.quote(os.environ["DB_PASSWORD"], safe=""); print(f"postgresql://{u}:{p}@postgresql-shared-rw.databases.svc:5432/txo_ai_gateway")')"
+              exec litellm --config /app/config.yaml --port 4000
+          env:
+            - name: DISABLE_SCHEMA_UPDATE
+              value: "true"
+          envFrom:
+            - secretRef:
+                name: txo-ai-gateway-runtime
+          ports:
+            - name: http
+              containerPort: 4000
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+              readOnly: true
+          startupProbe:
+            httpGet:
+              path: /health/liveliness
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health/liveliness
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 8Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: config
+          configMap:
+            name: txo-ai-gateway-config

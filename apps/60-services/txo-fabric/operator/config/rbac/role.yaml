@@ -1,0 +1,188 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: txo-fabric-operator
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - namespaces
+  - persistentvolumeclaims
+  - pods
+  - secrets
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cilium.io
+  resources:
+  - ciliumnetworkpolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - fabric.truxonline.io
+  resources:
+  - agentfunctionalprofiles
+  - agentruntimeprofiles
+  - aicredentialbrokerprofiles
+  - aigatewayprofiles
+  - hermesruntimereleases
+  - hindsightprofiles
+  - integrationbindings
+  - integrationconnections
+  - postgresqlprofiles
+  - sharedworkspaceprofiles
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - fabric.truxonline.io
+  resources:
+  - agentidentities
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - fabric.truxonline.io
+  resources:
+  - agentidentities/finalizers
+  - tenantbundles/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - fabric.truxonline.io
+  resources:
+  - agentidentities/status
+  - tenantbundles/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - fabric.truxonline.io
+  resources:
+  - tenantbundles
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  - networkpolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - clusters
+  verbs:
+  - get
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - databaseroles
+  - databases
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch

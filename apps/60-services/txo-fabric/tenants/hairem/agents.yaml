@@ -1,0 +1,373 @@
+# Canonical POC owner identity: usr000001 = charchess.
+# access.userRef deliberately remains the existing workspace scope key until #3802/#3852 define IAM/user-ID mapping.
+# Human display names stay mutable; machine identity and Hindsight bank IDs stay stable.
+---
+apiVersion: fabric.truxonline.io/v1alpha1
+kind: AgentIdentity
+metadata:
+  name: ten00001-usr000001-agt00001
+  labels:
+    app.kubernetes.io/part-of: txo-fabric
+spec:
+  tenantRef:
+    name: hairem
+  agentKey: usr000001-agt00001
+  displayName: Meli
+  runtime:
+    profileRef: hermes-default
+    storage:
+      retentionPolicy: Retain
+  access:
+    # Explicit chat intent for the existing pinned Authentik IAM group,
+    # NOT an OpenFGA tuple nor a workspace membership assertion.
+    chatIAMGroups:
+      - client0
+    userRef: charchess
+    groups:
+      - admin
+  humanAccess:
+    enabled: true
+  memory:
+    bankId: ten00001-usr000001-agt00001
+---
+apiVersion: fabric.truxonline.io/v1alpha1
+kind: AgentIdentity
+metadata:
+  name: ten00001-usr000001-agt00002
+  labels:
+    app.kubernetes.io/part-of: txo-fabric
+spec:
+  tenantRef:
+    name: hairem
+  agentKey: usr000001-agt00002
+  displayName: Electra
+  runtime:
+    profileRef: hermes-default
+    storage:
+      retentionPolicy: Retain
+    # First Open WebUI canary. The operator issues the unique API key and
+    # attests the private Service; no public Hermes endpoint is created.
+    # Production CI permits this single internal Open WebUI → Electra canary only.
+    privateAPI:
+      enabled: true
+      tenantId: TEN00001
+  access:
+    # Explicit chat intent for the existing pinned Authentik IAM group,
+    # NOT an OpenFGA tuple nor a workspace membership assertion.
+    chatIAMGroups:
+      - client0
+    userRef: charchess
+    groups:
+      - admin
+  humanAccess:
+    enabled: true
+  memory:
+    bankId: ten00001-usr000001-agt00002
+---
+apiVersion: fabric.truxonline.io/v1alpha1
+kind: AgentIdentity
+metadata:
+  name: ten00001-usr000001-agt00003
+  labels:
+    app.kubernetes.io/part-of: txo-fabric
+spec:
+  tenantRef:
+    name: hairem
+  agentKey: usr000001-agt00003
+  displayName: Aurelia
+  runtime:
+    profileRef: hermes-default
+    storage:
+      retentionPolicy: Retain
+  access:
+    # Explicit chat intent for the existing pinned Authentik IAM group,
+    # NOT an OpenFGA tuple nor a workspace membership assertion.
+    chatIAMGroups:
+      - client0
+    userRef: charchess
+    groups:
+      - admin
+  humanAccess:
+    enabled: true
+  memory:
+    bankId: ten00001-usr000001-agt00003
+---
+apiVersion: fabric.truxonline.io/v1alpha1
+kind: AgentIdentity
+metadata:
+  name: ten00001-usr000001-agt00004
+  labels:
+    app.kubernetes.io/part-of: txo-fabric
+spec:
+  tenantRef:
+    name: hairem
+  agentKey: usr000001-agt00004
+  displayName: Loona
+  runtime:
+    profileRef: hermes-default
+    storage:
+      retentionPolicy: Retain
+  access:
+    # Explicit chat intent for the existing pinned Authentik IAM group,
+    # NOT an OpenFGA tuple nor a workspace membership assertion.
+    chatIAMGroups:
+      - client0
+    userRef: charchess
+    groups:
+      - admin
+  humanAccess:
+    enabled: true
+  memory:
+    bankId: ten00001-usr000001-agt00004
+---
+apiVersion: fabric.truxonline.io/v1alpha1
+kind: AgentIdentity
+metadata:
+  name: ten00001-usr000001-agt00005
+  labels:
+    app.kubernetes.io/part-of: txo-fabric
+spec:
+  tenantRef:
+    name: hairem
+  agentKey: usr000001-agt00005
+  displayName: Sabrina
+  runtime:
+    profileRef: hermes-default
+    storage:
+      retentionPolicy: Retain
+  access:
+    # Explicit chat intent for the existing pinned Authentik IAM group,
+    # NOT an OpenFGA tuple nor a workspace membership assertion.
+    chatIAMGroups:
+      - client0
+    userRef: charchess
+    groups:
+      - admin
+  humanAccess:
+    enabled: true
+  memory:
+    bankId: ten00001-usr000001-agt00005
+---
+apiVersion: fabric.truxonline.io/v1alpha1
+kind: AgentIdentity
+metadata:
+  name: ten00001-usr000001-agt00006
+  labels:
+    app.kubernetes.io/part-of: txo-fabric
+spec:
+  tenantRef:
+    name: hairem
+  agentKey: usr000001-agt00006
+  displayName: Monara
+  runtime:
+    profileRef: hermes-default
+    storage:
+      retentionPolicy: Retain
+  access:
+    # Explicit chat intent for the existing pinned Authentik IAM group,
+    # NOT an OpenFGA tuple nor a workspace membership assertion.
+    chatIAMGroups:
+      - client0
+    userRef: charchess
+    groups:
+      - admin
+  humanAccess:
+    enabled: true
+  memory:
+    bankId: ten00001-usr000001-agt00006
+---
+apiVersion: fabric.truxonline.io/v1alpha1
+kind: AgentIdentity
+metadata:
+  name: ten00001-usr000001-agt00007
+  labels:
+    app.kubernetes.io/part-of: txo-fabric
+spec:
+  tenantRef:
+    name: hairem
+  agentKey: usr000001-agt00007
+  displayName: Ahri
+  runtime:
+    profileRef: hermes-default
+    storage:
+      retentionPolicy: Retain
+  access:
+    # Explicit chat intent for the existing pinned Authentik IAM group,
+    # NOT an OpenFGA tuple nor a workspace membership assertion.
+    chatIAMGroups:
+      - client0
+    userRef: charchess
+    groups:
+      - admin
+  humanAccess:
+    enabled: true
+  memory:
+    bankId: ten00001-usr000001-agt00007
+---
+apiVersion: fabric.truxonline.io/v1alpha1
+kind: AgentIdentity
+metadata:
+  name: ten00001-usr000001-agt00008
+  labels:
+    app.kubernetes.io/part-of: txo-fabric
+spec:
+  tenantRef:
+    name: hairem
+  agentKey: usr000001-agt00008
+  displayName: Lisa
+  runtime:
+    profileRef: hermes-default
+    storage:
+      retentionPolicy: Retain
+  access:
+    # Explicit chat intent for the existing pinned Authentik IAM group,
+    # NOT an OpenFGA tuple nor a workspace membership assertion.
+    chatIAMGroups:
+      - client0
+    userRef: charchess
+    groups:
+      - admin
+  humanAccess:
+    enabled: true
+  memory:
+    bankId: ten00001-usr000001-agt00008
+---
+apiVersion: fabric.truxonline.io/v1alpha1
+kind: AgentIdentity
+metadata:
+  name: ten00001-usr000001-agt00009
+  labels:
+    app.kubernetes.io/part-of: txo-fabric
+spec:
+  tenantRef:
+    name: hairem
+  agentKey: usr000001-agt00009
+  displayName: Leona
+  runtime:
+    profileRef: hermes-default
+    storage:
+      retentionPolicy: Retain
+  access:
+    # Explicit chat intent for the existing pinned Authentik IAM group,
+    # NOT an OpenFGA tuple nor a workspace membership assertion.
+    chatIAMGroups:
+      - client0
+    userRef: charchess
+    groups:
+      - admin
+  humanAccess:
+    enabled: true
+  memory:
+    bankId: ten00001-usr000001-agt00009
+---
+apiVersion: fabric.truxonline.io/v1alpha1
+kind: AgentIdentity
+metadata:
+  name: ten00001-usr000001-agt00010
+  labels:
+    app.kubernetes.io/part-of: txo-fabric
+spec:
+  tenantRef:
+    name: hairem
+  agentKey: usr000001-agt00010
+  displayName: Ivy
+  runtime:
+    profileRef: hermes-default
+    storage:
+      retentionPolicy: Retain
+  access:
+    # Explicit chat intent for the existing pinned Authentik IAM group,
+    # NOT an OpenFGA tuple nor a workspace membership assertion.
+    chatIAMGroups:
+      - client0
+    userRef: charchess
+    groups:
+      - admin
+  humanAccess:
+    enabled: true
+  memory:
+    bankId: ten00001-usr000001-agt00010
+---
+apiVersion: fabric.truxonline.io/v1alpha1
+kind: AgentIdentity
+metadata:
+  name: ten00001-usr000001-agt00011
+  labels:
+    app.kubernetes.io/part-of: txo-fabric
+spec:
+  tenantRef:
+    name: hairem
+  agentKey: usr000001-agt00011
+  displayName: Spark
+  runtime:
+    profileRef: hermes-edge
+    storage:
+      retentionPolicy: Retain
+  access:
+    # Explicit chat intent for the existing pinned Authentik IAM group,
+    # NOT an OpenFGA tuple nor a workspace membership assertion.
+    chatIAMGroups:
+      - client0
+    userRef: charchess
+    groups:
+      - admin
+  humanAccess:
+    enabled: true
+  memory:
+    bankId: ten00001-usr000001-agt00011
+---
+apiVersion: fabric.truxonline.io/v1alpha1
+kind: AgentIdentity
+metadata:
+  name: ten00001-usr000001-agt00012
+  labels:
+    app.kubernetes.io/part-of: txo-fabric
+spec:
+  tenantRef:
+    name: hairem
+  agentKey: usr000001-agt00012
+  displayName: Katia
+  runtime:
+    profileRef: hermes-default
+    storage:
+      retentionPolicy: Retain
+  access:
+    # Explicit chat intent for the existing pinned Authentik IAM group,
+    # NOT an OpenFGA tuple nor a workspace membership assertion.
+    chatIAMGroups:
+      - client0
+    userRef: charchess
+    groups:
+      - admin
+  humanAccess:
+    enabled: true
+  memory:
+    bankId: ten00001-usr000001-agt00012
+---
+apiVersion: fabric.truxonline.io/v1alpha1
+kind: AgentIdentity
+metadata:
+  name: ten00001-usr000001-agt00013
+  labels:
+    app.kubernetes.io/part-of: txo-fabric
+spec:
+  tenantRef:
+    name: hairem
+  agentKey: usr000001-agt00013
+  displayName: Nora
+  runtime:
+    profileRef: hermes-default
+    storage:
+      retentionPolicy: Retain
+  access:
+    # Explicit chat intent for the existing pinned Authentik IAM group,
+    # NOT an OpenFGA tuple nor a workspace membership assertion.
+    chatIAMGroups:
+      - client0
+    userRef: charchess
+    groups:
+      - admin
+  humanAccess:
+    enabled: true
+  memory:
+    bankId: ten00001-usr000001-agt00013

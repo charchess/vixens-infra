@@ -3,6 +3,20 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: argocd
 resources:
+  - apps/txo-fabric.yaml
+  - apps/trilium.yaml
+  - apps/traefik-middlewares.yaml
+  - apps/snapshot-controller.yaml
+  - apps/radar.yaml
+  - apps/pyload.yaml
+  - apps/openbao-secrets.yaml
+  - apps/music-assistant.yaml
+  - apps/metrics-server.yaml
+  - apps/mail.yaml
+  - apps/local-path-provisioner.yaml
+  - apps/homeassistant.yaml
+  - apps/cilium-lb.yaml
+  - apps/actual-budget.yaml
   - apps/postgresql-shared.yaml
   - apps/mosquitto.yaml
   - apps/loki.yaml

@@ -1,0 +1,18 @@
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: truenas-snapshot-retain
+  annotations:
+    snapshot.storage.kubernetes.io/is-default-class: "true"
+  labels:
+    velero.io/csi-volumesnapshot-class: "true"
+driver: synelia.csi.truenas.io
+deletionPolicy: Retain
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: truenas-snapshot-delete
+driver: synelia.csi.truenas.io
+deletionPolicy: Delete

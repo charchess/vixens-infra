@@ -1,0 +1,464 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: agentidentities.fabric.truxonline.io
+spec:
+  group: fabric.truxonline.io
+  names:
+    categories:
+    - txo-fabric
+    kind: AgentIdentity
+    listKind: AgentIdentityList
+    plural: agentidentities
+    shortNames:
+    - agentid
+    singular: agentidentity
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.tenantRef.name
+      name: Tenant
+      type: string
+    - jsonPath: .spec.agentKey
+      name: Key
+      type: string
+    - jsonPath: .spec.displayName
+      name: Agent
+      type: string
+    - jsonPath: .status.memory.bankId
+      name: Bank
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              access:
+                description: Access selects tenant-declared user/group shared workspace
+                  scopes.
+                properties:
+                  chatIAMGroups:
+                    description: |-
+                      ChatIAMGroups is an explicit agent.chat access intent referencing only
+                      TenantBundle.humanAccess.web.iamGroups keys, NOT workspace group keys.
+                      Authentik live membership, immutable UUID→Fabric ledger, and tenant
+                      group-UUID pins are separately verified before any tuple is written.
+                      Omitted/empty never implies an agent.chat permission.
+                    items:
+                      type: string
+                    maxItems: 32
+                    type: array
+                    x-kubernetes-list-type: set
+                  groups:
+                    description: Groups selects declared tenant group workspace scopes.
+                    items:
+                      type: string
+                    maxItems: 32
+                    type: array
+                    x-kubernetes-list-type: set
+                  userRef:
+                    description: UserRef selects one declared tenant user workspace
+                      scope.
+                    maxLength: 32
+                    pattern: ^$|^[a-z0-9]([a-z0-9-]*[a-z0-9])?$
+                    type: string
+                type: object
+              agentKey:
+                description: |-
+                  AgentKey is the immutable tenant-local machine identifier. AgentIdentity is cluster-scoped,
+                  so metadata.name is globally unique (for example hairem-sandbox-tina), while agentKey stays
+                  stable and concise inside the tenant cell (for example tina). Runtime resource names and the
+                  default memory bank ID are derived from this key, not from the global CR name.
+                maxLength: 63
+                minLength: 1
+                pattern: ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$
+                type: string
+                x-kubernetes-validations:
+                - message: agentKey is immutable
+                  rule: self == oldSelf
+              displayName:
+                description: DisplayName is the user-facing identity name.
+                maxLength: 128
+                minLength: 1
+                type: string
+              functional:
+                description: Functional selects a reusable business baseline without
+                  changing identity, private state or runtime ceiling.
+                properties:
+                  profileRef:
+                    maxLength: 253
+                    minLength: 1
+                    type: string
+                type: object
+              humanAccess:
+                description: |-
+                  HumanAccess opts this identity into the tenant-scoped authenticated human
+                  entry boundary. The tenant owns transport, public-domain and IAM settings.
+                properties:
+                  enabled:
+                    description: |-
+                      Enabled opts this stable AgentIdentity into the tenant's configured human
+                      entry transport. Transport/OIDC details stay tenant-owned so AgentIdentity
+                      remains channel-neutral.
+                    type: boolean
+                type: object
+              memory:
+                description: Memory binds the identity to its logical tenant memory
+                  bank.
+                properties:
+                  bankId:
+                    description: |-
+                      BankID optionally pins a logical bank identifier. When omitted the operator resolves
+                      <tenant-name>-<agent-key> and records the result in status.memory.bankId.
+                    maxLength: 128
+                    minLength: 2
+                    pattern: ^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$
+                    type: string
+                type: object
+              runtime:
+                description: Runtime selects how this identity is executed. Infrastructure
+                  details remain in the profile.
+                properties:
+                  capabilities:
+                    description: Capabilities selects only profile-declared AllowedOff
+                      capabilities.
+                    properties:
+                      enableToolsets:
+                        description: |-
+                          EnableToolsets activates profile entries whose state is AllowedOff.
+                          On entries require no opt-in; Off or undeclared entries cannot be requested.
+                        items:
+                          type: string
+                        maxItems: 64
+                        type: array
+                        x-kubernetes-list-type: set
+                    type: object
+                  privateAPI:
+                    description: |-
+                      PrivateAPI is an opt-in for an operator-owned private Responses Service and
+                      BFF-only ingress NetworkPolicy. It does not launch a listener, expose a
+                      credential, or mark endpoint readiness; omission preserves legacy behavior.
+                    properties:
+                      credentialRef:
+                        description: |-
+                          CredentialRef is a NON-SECRET reference name, not a secret or token.
+                          When set, it must equal hermes-api-<canonical agentKey>; omission derives that canonical name. Never read/mounted here.
+                        maxLength: 63
+                        pattern: ^hermes-api-[a-z0-9]([a-z0-9-]*[a-z0-9])?$
+                        type: string
+                        x-kubernetes-validations:
+                        - message: credentialRef is immutable
+                          rule: self == oldSelf
+                      enabled:
+                        default: false
+                        description: Enabled is desired future intent, NOT activation.
+                          Omitted/false is safe.
+                        type: boolean
+                      tenantId:
+                        description: TenantID is the immutable TenantBundle.spec.tenantId,
+                          not its slug.
+                        maxLength: 64
+                        pattern: ^TEN[0-9]{5,}$
+                        type: string
+                        x-kubernetes-validations:
+                        - message: tenantId is immutable
+                          rule: self == oldSelf
+                    type: object
+                    x-kubernetes-validations:
+                    - message: enabled private API requires canonical tenantId
+                      rule: '!has(self.enabled) || !self.enabled || (has(self.tenantId)
+                        && size(self.tenantId) > 0)'
+                  profileRef:
+                    default: hermes-default
+                    description: ProfileRef references an AgentRuntimeProfile by metadata.name.
+                    maxLength: 128
+                    minLength: 1
+                    type: string
+                  storage:
+                    description: Storage defines lifecycle intent for the identity's
+                      runtime workspace.
+                    properties:
+                      adoptLegacyProfile:
+                        description: |-
+                          AdoptLegacyProfile is a deprecated, stored-CR compatibility sentinel.
+                          True is rejected by the current reconciler before PVC/deployment mutation:
+                          removing it from an existing CR could silently substitute a different
+                          runtime home. Keep this API field readable until old CRs have received
+                          an explicitly reviewed data transition; new tenants must leave it unset.
+                        type: boolean
+                      retentionPolicy:
+                        default: Retain
+                        description: |-
+                          RetentionPolicy controls what happens to the Hermes runtime PVC when the
+                          AgentIdentity is deleted. Retain is the safe default for durable customer
+                          workspaces; Delete is an explicit opt-in for disposable identities.
+                        enum:
+                        - Retain
+                        - Delete
+                        type: string
+                        x-kubernetes-validations:
+                        - message: retentionPolicy is immutable
+                          rule: self == oldSelf
+                    type: object
+                    x-kubernetes-validations:
+                    - message: adoptLegacyProfile requires retentionPolicy Retain
+                      rule: '!has(self.adoptLegacyProfile) || !self.adoptLegacyProfile
+                        || self.retentionPolicy == ''Retain'''
+                    - message: adoptLegacyProfile cannot be changed once declared
+                      rule: '!has(oldSelf.adoptLegacyProfile) || (has(self.adoptLegacyProfile)
+                        && self.adoptLegacyProfile == oldSelf.adoptLegacyProfile)'
+                type: object
+              tenantRef:
+                description: TenantRef references the owning TenantBundle by metadata.name.
+                properties:
+                  name:
+                    description: Name is the metadata.name of the referenced cluster-scoped
+                      Fabric object.
+                    maxLength: 253
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+                x-kubernetes-validations:
+                - message: tenantRef.name is immutable
+                  rule: self.name == oldSelf.name
+            required:
+            - agentKey
+            - displayName
+            - tenantRef
+            type: object
+          status:
+            properties:
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              memory:
+                properties:
+                  bankId:
+                    description: BankID is the resolved logical memory-bank identity.
+                    type: string
+                  phase:
+                    description: Phase describes memory provisioning for this identity.
+                    type: string
+                type: object
+              namespace:
+                maxLength: 63
+                type: string
+              observedGeneration:
+                format: int64
+                type: integer
+              phase:
+                enum:
+                - Pending
+                - Provisioning
+                - Ready
+                - AuthBlocked
+                - Degraded
+                - Failed
+                - Deleting
+                type: string
+              runtime:
+                properties:
+                  deniedToolsets:
+                    description: DeniedToolsets lists profile-declared toolsets denied
+                      by the effective platform policy.
+                    items:
+                      type: string
+                    type: array
+                  deploymentName:
+                    description: DeploymentName is the generated Hermes Deployment.
+                    type: string
+                  enabledToolsets:
+                    description: EnabledToolsets lists toolsets admitted by the effective
+                      platform policy.
+                    items:
+                      type: string
+                    type: array
+                  humanEndpoint:
+                    description: |-
+                      HumanEndpoint is the stable authenticated human-facing endpoint when the
+                      AgentIdentity is opted into tenant human access.
+                    type: string
+                  integrationPolicyRevision:
+                    description: IntegrationPolicyRevision identifies the effective
+                      non-secret integration projection.
+                    type: string
+                  integrations:
+                    description: Integrations exposes effective/revoked/denied Fabric
+                      authorization without secret values.
+                    items:
+                      properties:
+                        bindingName:
+                          description: BindingName is the Fabric authorization object
+                            evaluated for this runtime.
+                          type: string
+                        connectionName:
+                          description: ConnectionName is the logical integration connection
+                            referenced by the binding.
+                          type: string
+                        operations:
+                          description: Operations are the effective generic operations
+                            requested by the binding.
+                          items:
+                            type: string
+                          type: array
+                        phase:
+                          description: Phase is Effective, Revoked or Denied. It never
+                            carries credential material.
+                          type: string
+                        reason:
+                          description: Reason is a stable non-secret diagnostic explaining
+                            the phase.
+                          type: string
+                        revision:
+                          description: Revision changes when binding, connection or
+                            credential metadata changes.
+                          type: string
+                        scopes:
+                          description: Scopes are the effective connection-defined
+                            scope labels.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - bindingName
+                      - connectionName
+                      - phase
+                      type: object
+                    type: array
+                  pvcName:
+                    description: PVCName is the generated runtime workspace PVC.
+                    type: string
+                  toolsetPolicyRevision:
+                    description: ToolsetPolicyRevision identifies the effective platform-owned
+                      Hermes toolset policy.
+                    type: string
+                type: object
+              runtimeStorageMigration:
+                description: RuntimeStorageMigration retains immutable UID-bound evidence
+                  after a runtime storage cutover.
+                properties:
+                  copyJobName:
+                    type: string
+                  copyJobUID:
+                    type: string
+                  evidenceSource:
+                    enum:
+                    - Job
+                    - LegacyTargetBinding
+                    type: string
+                  phase:
+                    enum:
+                    - Succeeded
+                    - LegacyRecovered
+                    - EvidenceConflict
+                    type: string
+                  sourceClaimName:
+                    type: string
+                  sourcePVCUID:
+                    type: string
+                  targetClaimName:
+                    type: string
+                  targetPVCUID:
+                    type: string
+                  verificationResult:
+                    type: string
+                required:
+                - evidenceSource
+                - phase
+                - sourceClaimName
+                - sourcePVCUID
+                - targetClaimName
+                - targetPVCUID
+                - verificationResult
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
