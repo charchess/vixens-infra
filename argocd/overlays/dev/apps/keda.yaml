@@ -1,0 +1,33 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keda
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  sources:
+    - repoURL: https://kedacore.github.io/charts
+      chart: keda
+      targetRevision: 2.18.3
+      helm:
+        valueFiles:
+          - $values/apps/00-infra/keda/values/common.yaml
+          - $values/apps/00-infra/keda/values/dev.yaml
+    - repoURL: https://github.com/charchess/vixens-infra.git
+      targetRevision: 319cf8182f6bf07ddd18c8ce02e7da7c4911a40a
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: keda
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

@@ -1,0 +1,34 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: snmp-exporter
+  namespace: argocd
+  labels:
+    vixens.lab/environment: dev
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "8"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/charchess/vixens-infra.git
+    targetRevision: 319cf8182f6bf07ddd18c8ce02e7da7c4911a40a
+    path: apps/02-monitoring/snmp-exporter/overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+  ignoreDifferences:
+    - group: operator.victoriametrics.com
+      kind: VMStaticScrape
+      name: snmp-unifi
+      namespace: monitoring
+      jsonPointers:
+        - /spec/targetEndpoints
