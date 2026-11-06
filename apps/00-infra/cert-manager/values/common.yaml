@@ -1,0 +1,119 @@
+---
+# Common cert-manager configuration for ALL environments
+# These values are shared across dev, test, staging, and production
+
+# ============================================================================
+# CRD Installation
+# ============================================================================
+# Install cert-manager CRDs as part of the Helm release
+installCRDs: true
+# ============================================================================
+# Global Configuration
+# ============================================================================
+global:
+  priorityClassName: vixens-high
+  leaderElection:
+    # Leader election namespace (should match deployment namespace)
+    namespace: cert-manager
+# ============================================================================
+# Control Plane Tolerations
+# ============================================================================
+# All cert-manager components run on control plane nodes
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+# Pod sizing labels for controller
+podLabels:
+  vixens.io/sizing.cert-manager: G-nano
+podAnnotations:
+  vixens.io/fast-start: "true"
+  vixens.io/noingressneeded: "true"
+  vixens.io/service-binding: "false"
+  vixens.io/no-long-connections: "true"
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9402"
+  prometheus.io/path: "/metrics"
+deploymentAnnotations:  # Deployment metadata annotations (Gold maturity: sync-wave + goldilocks)
+  argocd.argoproj.io/sync-wave: "0"
+  goldilocks.fairwinds.com/enabled: "true"
+  vpa.kubernetes.io/updateMode: "Off"
+revisionHistoryLimit: 3
+# Topology spread (Platinum requirement: 2 replicas must spread across nodes)
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: cert-manager
+# Probes configuration
+# Liveness probe is enabled by default in chart, adding readiness probe
+# https://github.com/cert-manager/cert-manager/blob/master/deploy/charts/cert-manager/values.yaml
+http:
+  enabled: true
+livenessProbe:
+  enabled: true
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 5
+# Webhook component
+webhook:
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  podLabels:
+    app: webhook  # For legacy Kyverno policy compatibility
+    vixens.io/sizing.webhook: G-nano
+  podAnnotations:
+    vixens.io/fast-start: "true"
+    vixens.io/service-binding: "false"
+    vixens.io/noingressneeded: "true"
+    vixens.io/no-long-connections: "true"
+    vixens.io/nometrics: "true"  # cert-manager webhook has no Prometheus metrics endpoint
+  deploymentAnnotations:
+    argocd.argoproj.io/sync-wave: "0"
+    goldilocks.fairwinds.com/enabled: "true"
+    vpa.kubernetes.io/updateMode: "Off"
+  revisionHistoryLimit: 3
+  livenessProbe:
+    enabled: true
+  readinessProbe:
+    enabled: true
+# CA Injector component
+cainjector:
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  podLabels:
+    vixens.io/sizing.cainjector: G-nano
+    vixens.io/single-replica: "true"
+  podAnnotations:
+    vixens.io/fast-start: "true"
+    vixens.io/service-binding: "false"
+    vixens.io/noingressneeded: "true"
+    vixens.io/no-long-connections: "true"
+    vixens.io/nometrics: "true"
+  deploymentAnnotations:
+    argocd.argoproj.io/sync-wave: "0"
+    goldilocks.fairwinds.com/enabled: "true"
+    vpa.kubernetes.io/updateMode: "Off"
+  revisionHistoryLimit: 3
+  livenessProbe:
+    enabled: true
+  readinessProbe:
+    enabled: true
+# Startup API check tolerations
+startupapicheck:
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  podAnnotations:
+    vixens.io/fast-start: "true"
+    vixens.io/service-binding: "false"
+    vixens.io/noingressneeded: "true"

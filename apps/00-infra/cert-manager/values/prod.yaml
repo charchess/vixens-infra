@@ -1,0 +1,45 @@
+---
+# Production environment overrides for cert-manager
+# VLAN 201 (192.168.201.0/24)
+
+# ============================================================================
+# Production-Specific Settings
+# ============================================================================
+# Production-grade resource limits (Emerald - Guaranteed QoS)
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+# Webhook resources
+webhook:
+  priorityClassName: vixens-high
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+# CA Injector resources
+cainjector:
+  priorityClassName: vixens-high
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+# Production-grade replica count
+replicaCount: 2
+# ============================================================================
+# Production Monitoring
+# ============================================================================
+# Enable Prometheus metrics for production
+# prometheus:
+#  enabled: true
+#  servicemonitor:
+#    enabled: true
