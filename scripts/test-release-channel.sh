@@ -20,6 +20,8 @@ require "$dev" 'branches: [main]'
 require "$dev" "github.event.workflow_run.conclusion == 'success'"
 require "$dev" "github.event.workflow_run.head_branch == 'main'"
 require "$dev" 'contents: write'
+require "$dev" 'git config user.name "GitHub Actions"'
+require "$dev" 'git config user.email "actions@github.com"'
 require "$dev" 'dev-v$(date -u +%Y.%m).${SHA:0:12}'
 require "$dev" 'refs/tags/$candidate'
 require "$dev" 'git push --force origin refs/tags/dev-latest'
