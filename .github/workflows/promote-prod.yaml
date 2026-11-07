@@ -76,6 +76,8 @@ jobs:
           PROD_TAG: ${{ steps.candidate.outputs.prod_tag }}
         run: |
           set -euo pipefail
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
           git tag -a "$PROD_TAG" -m "Promoted component release $PROD_TAG" "$SHA"
           git push origin "refs/tags/$PROD_TAG"
           git tag -f prod-stable "$SHA"
