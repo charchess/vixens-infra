@@ -16,9 +16,8 @@ resources:
   - ../../openfga/runtime
   # BFF private, browser auth OFF; bootstrap DB/credentials is NOT activated.
   - ../../webui
-  - ../../tenants/indiba
-  - ../../tenants/hairem
-  - ../../tenants/hairem-sandbox
+  # Retired tenants are deliberately absent so Argo can complete the approved
+  # controller-led cleanup; their historical manifests remain in Git history.
   - ../../tenants/fabric-smoke
 
 # Phase 2b activates the authoritative operator after phase 2a proved that the
