@@ -13,7 +13,9 @@ spec:
   project: default
   source:
     repoURL: https://github.com/charchess/vixens-infra.git
-    targetRevision: a10b6e0c9a154e4de470b12bb99413b2c5951644
+    # #53: use the reviewed retirement revision; this preserves application
+    # identity while letting the existing automated prune finish tenant cleanup.
+    targetRevision: 9c176eeb2d849bd5c3179a157b2cdf9aa5736780
     path: apps/60-services/txo-fabric/overlays/prod
   destination:
     server: https://kubernetes.default.svc
