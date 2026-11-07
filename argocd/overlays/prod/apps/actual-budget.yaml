@@ -7,6 +7,6 @@ metadata:
   finalizers: [resources-finalizer.argocd.argoproj.io]
 spec:
   project: default
-  source: {repoURL: https://github.com/charchess/vixens-infra.git, targetRevision: 0dc7cda501f8f36b18d080b83e1efb78dc2fc866, path: apps/60-services/actual-budget/overlays/prod}
+  source: {repoURL: https://github.com/charchess/vixens-infra.git, targetRevision: a10b6e0c9a154e4de470b12bb99413b2c5951644, path: apps/60-services/actual-budget/overlays/prod}
   destination: {server: https://kubernetes.default.svc, namespace: finance}
   syncPolicy: {automated: {prune: true, selfHeal: true}, syncOptions: [CreateNamespace=true]}
