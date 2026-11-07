@@ -1,0 +1,91 @@
+name: Promote component release to production
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_tag:
+        description: Exact immutable development tag to promote (for example dev-v2026.11.abcdef123456)
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: component-release-prod
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Verify and promote exact validated candidate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Verify exact development candidate and validation evidence
+        id: candidate
+        env:
+          CANDIDATE: ${{ inputs.candidate_tag }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          case "$CANDIDATE" in
+            dev-v[0-9][0-9][0-9][0-9].0[1-9].*|dev-v[0-9][0-9][0-9][0-9].1[0-2].*) ;;
+            *) echo "candidate_tag must match dev-vYYYY.MM.<identifier>" >&2; exit 1 ;;
+          esac
+          git fetch --force --tags origin
+          git show-ref --verify --quiet "refs/tags/$CANDIDATE" || {
+            echo "Candidate tag does not exist: $CANDIDATE" >&2
+            exit 1
+          }
+          candidate_sha="$(git rev-parse "$CANDIDATE^{commit}")"
+          git merge-base --is-ancestor "$candidate_sha" origin/main || {
+            echo "Candidate is not an ancestor of origin/main" >&2
+            exit 1
+          }
+          runs_url="https://api.github.com/repos/$REPOSITORY/actions/runs?head_sha=$candidate_sha&status=completed&per_page=100"
+          curl --fail --silent --show-error \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "$runs_url" > runs.json
+          jq -e --arg sha "$candidate_sha" '
+            any(.workflow_runs[];
+              .name == "Validate & Security" and
+              .conclusion == "success" and
+              .head_sha == $sha and
+              .head_branch == "main")
+          ' runs.json >/dev/null || {
+            echo "No exact successful Validate & Security run exists for $candidate_sha" >&2
+            exit 1
+          }
+          suffix="${CANDIDATE#dev-v}"
+          prod_tag="prod-v$suffix"
+          git ls-remote --exit-code --tags origin "refs/tags/$prod_tag" >/dev/null && {
+            echo "Immutable production tag already exists: $prod_tag" >&2
+            exit 1
+          }
+          printf 'sha=%s\nprod_tag=%s\n' "$candidate_sha" "$prod_tag" >> "$GITHUB_OUTPUT"
+      - name: Create immutable production tag and move stable pointer
+        env:
+          SHA: ${{ steps.candidate.outputs.sha }}
+          PROD_TAG: ${{ steps.candidate.outputs.prod_tag }}
+        run: |
+          set -euo pipefail
+          git tag -a "$PROD_TAG" -m "Promoted component release $PROD_TAG" "$SHA"
+          git push origin "refs/tags/$PROD_TAG"
+          git tag -f prod-stable "$SHA"
+          git push --force origin refs/tags/prod-stable
+      - name: Verify published production tags
+        env:
+          SHA: ${{ steps.candidate.outputs.sha }}
+          PROD_TAG: ${{ steps.candidate.outputs.prod_tag }}
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          test "$(git rev-parse "$PROD_TAG^{commit}")" = "$SHA"
+          test "$(git rev-parse 'prod-stable^{commit}')" = "$SHA"

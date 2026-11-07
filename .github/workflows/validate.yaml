@@ -89,6 +89,14 @@ jobs:
             fi
           done
 
+  release-channel-contract:
+    name: Release channel contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert repository-local release safety contract
+        run: bash scripts/test-release-channel.sh
+
   scope-boundary:
     name: Scope boundary
     runs-on: ubuntu-latest
@@ -127,6 +135,7 @@ jobs:
       - secret-scan
       - kustomize-render
       - scope-boundary
+      - release-channel-contract
 
     runs-on: ubuntu-latest
     steps:
