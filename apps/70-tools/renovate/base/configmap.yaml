@@ -10,7 +10,7 @@ data:
       "gitAuthor": "Renovate Bot <renovate@vixens.local>",
       "onboarding": false,
       "requireConfig": "optional",
-      "repositories": ["charchess/vixens"],
+      "repositories": ["charchess/vixens-core", "charchess/vixens-infra", "charchess/vixens-perso", "charchess/vixens-fabric"],
       "baseBranches": ["main"],
       "schedule": ["at any time"]
     }
