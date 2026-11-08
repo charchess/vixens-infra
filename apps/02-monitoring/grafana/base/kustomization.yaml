@@ -11,7 +11,6 @@ resources:
   - dashboards/trivy-vulnerability-explorer.yaml
   - dashboards/container-image-versions.yaml
   - dashboards/network-cilium-overview.yaml
-  - dashboards/dataangel.yaml
   - dashboards/argocd.yaml
   - dashboards/cert-manager.yaml
   - dashboards/unifi-snmp.yaml

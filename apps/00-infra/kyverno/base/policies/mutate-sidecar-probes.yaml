@@ -15,7 +15,6 @@
 # Targeted sidecars:
 #   - config-syncer (rclone sync loop for config directory backup)
 #
-# NOT targeted: litestream (already has metrics HTTP probes per its manifest)
 #
 # Reference: ADR-023 Level 2 Silver — require-probes.yaml validates the result.
 apiVersion: kyverno.io/v1
