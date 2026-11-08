@@ -31,6 +31,3 @@ spec:
               - key: "{{ request.object.spec.containers[?contains(image, 'rclone')] | length(@) }}"
                 operator: Equals
                 value: 0
-              - key: "{{ (request.object.spec.initContainers || `[]`)[?contains(image, 'dataangel')] | length(@) }}"
-                operator: Equals
-                value: 0

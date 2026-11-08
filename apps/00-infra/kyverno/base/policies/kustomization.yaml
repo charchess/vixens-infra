@@ -24,7 +24,6 @@ resources:
   - check-security-context.yaml
   - check-service-binding.yaml
   - check-servicemonitor.yaml
-  - check-sidecar-relevance.yaml
   - check-sizing-mode.yaml
   - check-stability.yaml
   - check-startup-probe.yaml
@@ -51,7 +50,6 @@ resources:
   - rbac-secrets.yaml
   - rbac-servicemonitors.yaml
   - require-goldilocks.yaml
-  - require-litestream-monitoring.yaml
   - require-namespace-pod-security.yaml
   - require-priority-class.yaml
   - require-probes.yaml
