@@ -4,39 +4,24 @@ set -euo pipefail
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 kustomize=${KUSTOMIZE:-kustomize}
 target="$root/apps/20-media/music-assistant/overlays/prod"
+fixture="$root/tests/fixtures/music-assistant-infisical-default-managed-secret-reference.yaml"
+checker="$root/tests/music_assistant_secret_controller.py"
 rendered=$(mktemp)
-trap 'rm -f "$rendered"' EXIT
+error=$(mktemp)
+trap 'rm -f "$rendered" "$error"' EXIT
 
 "$kustomize" build "$target" >"$rendered"
+python3 "$checker" "$rendered"
 
-python3 - "$rendered" <<'PY'
-import re
-import sys
-from pathlib import Path
+if python3 "$checker" "$fixture" > /dev/null 2>"$error"; then
+  printf '%s\n' 'expected the legacy Infisical fixture to be rejected' >&2
+  exit 1
+fi
+grep -Fqx 'legacy InfisicalSecret metadata default/music-assistant-secrets effectively targets media/music-assistant-secrets' "$error"
 
-rendered = Path(sys.argv[1]).read_text()
-documents = [doc for doc in re.split(r'^---\s*$', rendered, flags=re.MULTILINE) if doc.strip()]
-external = []
-infisical = []
+if git -c safe.directory="$root" -C "$root" grep -n -E '(^kind:[[:space:]]*InfisicalSecret[[:space:]]*$|^[[:space:]]*managedSecretReference:)' -- . ':(exclude)tests/**'; then
+  printf '%s\n' 'Infisical source remains outside the isolated RED fixture' >&2
+  exit 1
+fi
 
-for document in documents:
-    kind = re.search(r'^kind:\s*(\S+)\s*$', document, re.MULTILINE)
-    name = re.search(r'^  name:\s*(music-assistant-secrets)\s*$', document, re.MULTILINE)
-    namespace = re.search(r'^  namespace:\s*(media)\s*$', document, re.MULTILINE)
-    if not kind or not name or not namespace:
-        continue
-    if kind.group(1) == 'ExternalSecret':
-        target = re.search(r'^  target:\n(?:.*\n)*?^    name:\s*(music-assistant-secrets)\s*$', document, re.MULTILINE)
-        store = re.search(r'^  secretStoreRef:\n(?:.*\n)*?^    name:\s*(openbao)\s*$', document, re.MULTILINE)
-        if target and store:
-            external.append(document)
-    if kind.group(1) == 'InfisicalSecret':
-        infisical.append(document)
-
-if len(external) != 1:
-    raise SystemExit(f'expected exactly one ESO/OpenBao ExternalSecret target, found {len(external)}')
-if infisical:
-    raise SystemExit('legacy InfisicalSecret still targets music-assistant-secrets')
-
-print('music-assistant secret controller: ESO/OpenBao unique; Infisical absent')
-PY
+printf '%s\n' 'music-assistant secret controller: ESO/OpenBao unique; Infisical absent'
