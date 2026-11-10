@@ -1,0 +1,22 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cnpg-dr-REPLACE_RUN_ID
+  namespace: cnpg-dr-REPLACE_RUN_ID
+  labels:
+    vixens.io/dr-target: disposable
+    vixens.io/run-id: REPLACE_RUN_ID
+spec:
+  instances: 1
+  bootstrap:
+    recovery:
+      source: cnpg-dr-REPLACE_RUN_ID-objectstore-readonly
+  externalClusters:
+    - name: cnpg-dr-REPLACE_RUN_ID-objectstore-readonly
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: cnpg-dr-REPLACE_RUN_ID-objectstore-readonly
+  storage:
+    size: REPLACE_CLUSTER_SIZE
+    storageClass: REPLACE_EPHEMERAL_STORAGE_CLASS
