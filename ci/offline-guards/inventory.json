@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "owner": "Ariane",
+  "review_owner": "Verity",
+  "offline_definition": "No cluster, secret, cloud API, or mutable remote dependency is needed to evaluate a fixture.",
+  "guards": [
+    {"id": "repository-hygiene", "implementation": ".github/workflows/validate.yaml#repository-hygiene", "libraries": ["git"], "fixtures": [], "lockfiles_or_pins": ["actions/checkout@v4"], "paths": ["README.md", "AGENTS.md", "WORKFLOW.md", "contracts/README.md"], "blocking": true},
+    {"id": "actionlint", "implementation": ".github/workflows/validate.yaml#actionlint", "libraries": ["rhysd/actionlint@v1.7.7"], "fixtures": [], "lockfiles_or_pins": ["rhysd/actionlint@v1.7.7"], "paths": [".github/workflows/**"], "blocking": true},
+    {"id": "yaml-lint", "implementation": ".github/workflows/validate.yaml#yaml-lint", "libraries": ["yamllint==1.37.1"], "fixtures": [], "lockfiles_or_pins": ["yamllint==1.37.1"], "paths": ["**/*.yaml", "**/*.yml"], "blocking": true},
+    {"id": "secret-scan", "implementation": ".github/workflows/validate.yaml#secret-scan", "libraries": ["gitleaks/gitleaks-action@v2"], "fixtures": [], "lockfiles_or_pins": ["gitleaks/gitleaks-action@v2", ".gitleaks.toml"], "paths": [".gitleaks.toml"], "blocking": true},
+    {"id": "kustomize-render", "implementation": ".github/workflows/validate.yaml#kustomize-render", "libraries": ["kustomize@5.5.0", "helm@3.16.3"], "fixtures": [], "lockfiles_or_pins": ["apps/04-databases/cloudnative-pg/base/charts/cloudnative-pg-0.29.1/cloudnative-pg/Chart.lock", "kustomize@5.5.0", "helm@3.16.3"], "paths": ["**/kustomization.yaml"], "blocking": true},
+    {"id": "release-channel-contract", "implementation": "scripts/test-release-channel.sh", "libraries": ["bash", "git", "grep"], "fixtures": [], "lockfiles_or_pins": [], "paths": ["scripts/test-release-channel.sh", ".github/workflows/tag-dev.yaml", ".github/workflows/promote-prod.yaml"], "blocking": true},
+    {"id": "scope-boundary", "implementation": ".github/workflows/validate.yaml#scope-boundary", "libraries": ["python3"], "fixtures": [], "lockfiles_or_pins": [], "paths": ["**/*.yaml", "**/*.yml"], "blocking": true}
+  ]
+}

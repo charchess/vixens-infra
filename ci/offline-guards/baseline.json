@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "source_sha": "691eda72bc83b872b9ec2d69f7b3a6ebab3e969e",
+  "workflow": "Validate & Security",
+  "run": {"id": 42531098811, "url": "https://github.com/charchess/vixens-infra/actions/runs/42531098811", "conclusion": "success"},
+  "jobs": [
+    {"id": 128885244475, "name": "Secret scanning", "conclusion": "success"},
+    {"id": 128885244599, "name": "Repository hygiene", "conclusion": "success"},
+    {"id": 128885244605, "name": "Scope boundary", "conclusion": "success"},
+    {"id": 128885244635, "name": "Kustomize render", "conclusion": "success"},
+    {"id": 128885244640, "name": "YAML syntax and style", "conclusion": "success"},
+    {"id": 128885244675, "name": "Release channel contract", "conclusion": "success"},
+    {"id": 128885244676, "name": "GitHub Actions lint", "conclusion": "success"},
+    {"id": 128885375897, "name": "Validation Summary", "conclusion": "success"}
+  ],
+  "note": "This is observed CI evidence only. Issue #88 adds no workflow or required-check mutation."
+}

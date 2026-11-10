@@ -1,0 +1,10 @@
+{
+  "name": "unmapped-path-is-explicitly-not-applicable",
+  "changed_paths": ["docs/ci/offline-guard-notes.txt"],
+  "expected": {
+    "exit_code": 0,
+    "decision": "not_applicable",
+    "guards": [],
+    "rule": "no_path_rule_matched"
+  }
+}
