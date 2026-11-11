@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cnpg-dr-REPLACE_RUN_ID-scratch
+  namespace: cnpg-dr-REPLACE_RUN_ID
+  labels:
+    vixens.io/dr-target: disposable
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: REPLACE_SCRATCH_SIZE
+  storageClassName: REPLACE_EPHEMERAL_STORAGE_CLASS

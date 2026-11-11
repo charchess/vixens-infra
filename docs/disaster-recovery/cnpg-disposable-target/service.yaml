@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cnpg-dr-REPLACE_RUN_ID-inspection
+  namespace: cnpg-dr-REPLACE_RUN_ID
+  labels:
+    app.kubernetes.io/name: cnpg-dr-REPLACE_RUN_ID
+    vixens.io/dr-target: disposable
+spec:
+  type: ClusterIP
+  selector:
+    cnpg.io/cluster: cnpg-dr-REPLACE_RUN_ID
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: 5432
