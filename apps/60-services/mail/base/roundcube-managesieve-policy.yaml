@@ -1,0 +1,23 @@
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: roundcube-private-managesieve-egress
+  namespace: mail
+  labels:
+    environment: prod
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: roundcube
+      app.kubernetes.io/part-of: truxonline-mail
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: mail
+            k8s:app.kubernetes.io/name: mailserver
+            k8s:app.kubernetes.io/part-of: truxonline-mail
+      toPorts:
+        - ports:
+            - port: "4190"
+              protocol: TCP

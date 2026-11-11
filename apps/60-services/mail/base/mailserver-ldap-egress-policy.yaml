@@ -40,3 +40,4 @@ spec:
         - ports:
             - {port: "993", protocol: TCP}
             - {port: "587", protocol: TCP}
+            - {port: "4190", protocol: TCP}
