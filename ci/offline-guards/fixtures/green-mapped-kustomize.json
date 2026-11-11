@@ -1,0 +1,10 @@
+{
+  "name": "mapped-kustomization-is-applicable",
+  "changed_paths": ["apps/99-test/whoami/base/kustomization.yaml"],
+  "expected": {
+    "exit_code": 0,
+    "decision": "applicable",
+    "guards": ["kustomize-render"],
+    "rule": "apps/**/kustomization.yaml"
+  }
+}

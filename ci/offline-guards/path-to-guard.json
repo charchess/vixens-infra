@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "control_paths": [
+    ".github/workflows/validate.yaml",
+    "ci/offline-guards/**",
+    "scripts/check-offline-guard-contract.py",
+    "apps/04-databases/cloudnative-pg/base/charts/cloudnative-pg-0.29.1/cloudnative-pg/Chart.lock"
+  ],
+  "rules": [
+    {"glob": "apps/**/kustomization.yaml", "guards": ["kustomize-render"], "owner": "Ariane"},
+    {"glob": ".github/workflows/**", "guards": ["actionlint"], "owner": "Ariane"},
+    {"glob": "scripts/test-release-channel.sh", "guards": ["release-channel-contract"], "owner": "Ariane"},
+    {"glob": ".github/workflows/tag-dev.yaml", "guards": ["release-channel-contract"], "owner": "Ariane"},
+    {"glob": ".github/workflows/promote-prod.yaml", "guards": ["release-channel-contract"], "owner": "Ariane"},
+    {"glob": ".gitleaks.toml", "guards": ["secret-scan"], "owner": "Ariane"},
+    {"glob": "**/*.yaml", "guards": ["yaml-lint", "scope-boundary"], "owner": "Ariane"},
+    {"glob": "**/*.yml", "guards": ["yaml-lint", "scope-boundary"], "owner": "Ariane"},
+    {"glob": "README.md", "guards": ["repository-hygiene"], "owner": "Ariane"},
+    {"glob": "AGENTS.md", "guards": ["repository-hygiene"], "owner": "Ariane"},
+    {"glob": "WORKFLOW.md", "guards": ["repository-hygiene"], "owner": "Ariane"},
+    {"glob": "contracts/README.md", "guards": ["repository-hygiene"], "owner": "Ariane"}
+  ],
+  "not_applicable_rule": "no_path_rule_matched",
+  "policy": "A changed control path forces every required offline guard. A normal mapped path selects every matching rule. No match is an explicit not_applicable decision with source SHA and changed-path digest; it is never a CI skip."
+}

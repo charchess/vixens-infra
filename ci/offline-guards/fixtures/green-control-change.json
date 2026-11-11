@@ -1,0 +1,9 @@
+{
+  "name": "guard-control-change-forces-all-required-guards",
+  "changed_paths": ["ci/offline-guards/path-to-guard.json"],
+  "expected": {
+    "exit_code": 0,
+    "decision": "applicable",
+    "rule": "control-plane"
+  }
+}
