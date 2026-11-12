@@ -1,0 +1,12 @@
+---
+# Dedicated projected identity for the OpenBao Kubernetes-auth Transit role.
+# It intentionally receives no Kubernetes RBAC grant in this contract.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openbao-transit
+  namespace: external-secrets
+  labels:
+    app.kubernetes.io/part-of: openbao
+    app.kubernetes.io/component: transit-client
+automountServiceAccountToken: false
