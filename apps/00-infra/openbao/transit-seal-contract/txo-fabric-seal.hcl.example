@@ -1,5 +1,6 @@
-# Non-executable source-only policy example for Issue #4071.
+# Non-executable source-only policy contract for Infra #104.
 # It is not selected, installed, or an authorization record.
+# The separately gated OpenBao policy name is txo-fabric-seal.
 
 path "transit/encrypt/txo-fabric-seal" {
   capabilities = ["update"]
