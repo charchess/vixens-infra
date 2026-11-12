@@ -5,7 +5,6 @@ metadata:
   name: adguard-home
   labels:
     app: adguard-home
-    vixens.io/sizing: G-small
     vixens.io/backup-profile: "relaxed"
 spec:
   replicas: 1
