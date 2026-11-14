@@ -1,1 +1,0 @@
-{"changed_paths_sha256": "d96487c44c576e88327f3c008862cf57d339476ab8c45614c065a9c18c859f4f", "decision": "applicable", "guards": ["actionlint", "kustomize-render", "release-channel-contract", "repository-hygiene", "scope-boundary", "secret-scan", "yaml-lint"], "result": "passed", "rule": "control-plane", "source_sha": "691eda72bc83b872b9ec2d69f7b3a6ebab3e969e"}

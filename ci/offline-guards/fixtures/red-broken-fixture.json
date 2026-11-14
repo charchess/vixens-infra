@@ -1,8 +1,0 @@
-{
-  "name": "invalid-fixture-is-rejected",
-  "changed_paths": ["apps/99-test/whoami/base/kustomization.yaml"],
-  "fixture_valid": false,
-  "expected": {
-    "exit_code": 1
-  }
-}

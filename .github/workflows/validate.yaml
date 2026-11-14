@@ -141,7 +141,23 @@ jobs:
     steps:
       - name: Fail closed on a non-success required gate
         env:
-          RESULTS: ${{ toJson(needs.*.result) }}
+          RESULTS: ${{ toJson(needs) }}
+          REQUIRED_GUARDS: '["repository-hygiene","actionlint","yaml-lint","secret-scan","kustomize-render","scope-boundary","release-channel-contract"]'
         run: |
-          echo "$RESULTS"
-          test "$(jq '[.[] | select(. != "success" and . != "skipped")] | length' <<< "$RESULTS")" = 0
+          python3 - <<'PYTHON'
+          import json
+          import os
+          import sys
+
+          results = json.loads(os.environ["RESULTS"])
+          required = json.loads(os.environ["REQUIRED_GUARDS"])
+          missing = [guard for guard in required if guard not in results]
+          non_success = {
+              guard: results[guard].get("result")
+              for guard in required
+              if guard in results and results[guard].get("result") != "success"
+          }
+          if missing or non_success:
+              print(json.dumps({"missing": missing, "non_success": non_success}, sort_keys=True))
+              sys.exit(1)
+          PYTHON

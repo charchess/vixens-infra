@@ -1,35 +1,15 @@
 # Offline guard contract
 
-This directory is a versioned, local-only contract for the repository's current CI guards. It is **not** wired into GitHub Actions by this issue and it does not change `.github/workflows/validate.yaml`, workflows, rulesets, GitOps, or runtime.
+This local-only contract maps changed paths to required validation guards. It makes no GitHub ruleset, permission, GitOps, runtime, release, merge or deployment change.
 
-## Inventory, ownership, and baseline
+## Candidate provenance and applicability
 
-- `inventory.json` inventories every current blocking guard with its implementation, libraries, fixtures (none existed at the baseline), pins/lockfiles, watched paths, and blocking status. Ariane owns implementation and map qualification; Verity owns review of evidence sufficiency.
-- `baseline.json` records the exact observed `Validate & Security` baseline: source SHA `691eda72bc83b872b9ec2d69f7b3a6ebab3e969e`, successful run `42531098811`, and all eight job IDs/conclusions.
-- The only repository lockfile found at the baseline is the vendored CloudNativePG `Chart.lock`; the inventory also records action, linter, Kustomize, and Helm pins because they affect guard behavior.
+The checker requires `--source-sha` for every evaluation. Tests resolve it from `git rev-parse HEAD`; each output therefore records the exact candidate head evaluated, the matching rule, and a SHA-256 digest of sorted changed paths. A no-match is `not_applicable` only with `no_path_rule_matched`, that candidate SHA and digest.
 
-## Applicability map
+Control-plane changes require all blocking guards. A `.github/workflows/**` diff requires `actionlint`, `yaml-lint` and `scope-boundary`; other rules are in `path-to-guard.json`. Every required guard must be explicitly `success`; missing, skipped, cancelled, neutral, timed_out, action_required and unknown states fail, preserving their actual state in output.
 
-`path-to-guard.json` is the authoritative path-to-guard map. Its own changes, the fixture contract, the future checker, `validate.yaml`, and the Chart lockfile are control-plane changes: they select every required offline guard. Normal paths select every matching listed rule. A non-match produces a `not_applicable` result with the baseline SHA, a SHA-256 digest of the sorted changed-path list, and `no_path_rule_matched`; it is never represented as an opaque GitHub skip.
+## Evidence
 
-The checker is intentionally offline: it reads only versioned JSON and its fixture argument, and calls no cluster, secret store, cloud API, or mutable remote dependency.
+Run `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_offline_guard_contract.py -v`. GREEN fixtures cover mapped, control-plane, workflow, and not_applicable decisions. RED fixtures cover all relevant non-success states, including a workflow actionlint skip. The current branch head is the evaluated candidate; no static fixture embeds a stale predecessor SHA.
 
-## Fixtures and evidence
-
-Run the local contract test suite:
-
-```bash
-python3 -m unittest tests/test_offline_guard_contract.py -v
-```
-
-The fixtures demonstrate:
-
-| Fixture | Expected result |
-| --- | --- |
-| `green-mapped-kustomize.json` | A mapped Kustomization path selects the Kustomize render guard and related YAML guards. |
-| `green-control-change.json` | A mapping/control change selects every required guard. |
-| `green-not-applicable.json` | An unmapped path has an explicit, traced `not_applicable` result. |
-| `red-broken-fixture.json` | A deliberately invalid fixture fails. |
-| `red-missing-required-guard.json` | A missing required guard fails; skipped/cancelled are treated identically by the checker. |
-
-`evidence/` is the checked-in stdout for each fixture; the test suite verifies it exactly. RED fixtures intentionally return exit code 1. These artifacts are review evidence for a future, separately approved CI integration, not a release verdict.
+External branch protection/rulesets remain unverified by design; Validation Summary is independently fail-closed.

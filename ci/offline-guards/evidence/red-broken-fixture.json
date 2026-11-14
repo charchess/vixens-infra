@@ -1,1 +1,0 @@
-{"changed_paths_sha256": "65e7ff8917438e93a48d86a255986154de7b9ea334e7fdf3e4b26302ddb9cd6b", "decision": "applicable", "failure": "fixture validation failed", "guards": ["kustomize-render", "scope-boundary", "yaml-lint"], "result": "failed", "rule": "apps/**/kustomization.yaml", "source_sha": "691eda72bc83b872b9ec2d69f7b3a6ebab3e969e"}
