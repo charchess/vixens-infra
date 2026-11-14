@@ -1,0 +1,13 @@
+{
+  "changed_paths": [
+    ".github/workflows/ci-only.yaml"
+  ],
+  "expected": {
+    "exit_code": 1
+  },
+  "guard_statuses": {
+    "actionlint": "skipped",
+    "scope-boundary": "success",
+    "yaml-lint": "success"
+  }
+}

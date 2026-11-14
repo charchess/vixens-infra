@@ -1,16 +1,7 @@
 {
-  "implementation_source_sha": "dae2acc3a27a623b7cd8ee61a5e1b0a4e4decdbd",
-  "limitation": "External branch protection/ruleset configuration is not verified by this contract.",
-  "observed_prior_baseline": {
-    "conclusion": "success",
-    "run_id": 42531098811,
-    "source_sha": "691eda72bc83b872b9ec2d69f7b3a6ebab3e969e"
-  },
-  "provenance": {
-    "investigation": "https://github.com/charchess/vixens-infra/issues/73",
-    "issue": "https://github.com/charchess/vixens-infra/issues/114",
-    "method": "offline fixtures plus static workflow inspection"
-  },
-  "schema_version": 2,
-  "workflow": "Validate & Security"
+  "candidate_source": "required --source-sha argument resolved from git HEAD by tests",
+  "issue": "https://github.com/charchess/vixens-infra/issues/114",
+  "limitation": "External branch protection/rulesets are not verified by this offline contract.",
+  "prior_investigation_sha": "dae2acc3a27a623b7cd8ee61a5e1b0a4e4decdbd",
+  "schema_version": 3
 }

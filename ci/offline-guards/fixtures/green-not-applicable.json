@@ -4,6 +4,5 @@
   ],
   "expected": {
     "exit_code": 0
-  },
-  "source_sha": "dae2acc3a27a623b7cd8ee61a5e1b0a4e4decdbd"
+  }
 }
