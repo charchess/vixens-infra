@@ -1,0 +1,14 @@
+{
+  "changed_paths": [
+    "apps/99-test/whoami/base/kustomization.yaml"
+  ],
+  "expected": {
+    "exit_code": 1
+  },
+  "guard_statuses": {
+    "kustomize-render": "missing",
+    "scope-boundary": "success",
+    "yaml-lint": "success"
+  },
+  "source_sha": "dae2acc3a27a623b7cd8ee61a5e1b0a4e4decdbd"
+}

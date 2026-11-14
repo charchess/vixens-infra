@@ -1,35 +1,23 @@
 # Offline guard contract
 
-This directory is a versioned, local-only contract for the repository's current CI guards. It is **not** wired into GitHub Actions by this issue and it does not change `.github/workflows/validate.yaml`, workflows, rulesets, GitOps, or runtime.
+This directory is a versioned, local-only contract for the relevant guards in `Validate & Security`. It supplies static evidence for issue #114; it does not change GitHub rulesets, permissions, GitOps, runtime, release, merge or deployment.
 
-## Inventory, ownership, and baseline
+## Deterministic applicability
 
-- `inventory.json` inventories every current blocking guard with its implementation, libraries, fixtures (none existed at the baseline), pins/lockfiles, watched paths, and blocking status. Ariane owns implementation and map qualification; Verity owns review of evidence sufficiency.
-- `baseline.json` records the exact observed `Validate & Security` baseline: source SHA `691eda72bc83b872b9ec2d69f7b3a6ebab3e969e`, successful run `42531098811`, and all eight job IDs/conclusions.
-- The only repository lockfile found at the baseline is the vendored CloudNativePG `Chart.lock`; the inventory also records action, linter, Kustomize, and Helm pins because they affect guard behavior.
+`path-to-guard.json` is the authoritative `changed paths -> required guards` inventory. A control-plane change to the workflow, map, checker or declared lockfile requires every blocking guard. A normal changed path selects the union of every matching rule. A non-match is `not_applicable` only when the checker records the evaluated source SHA, `no_path_rule_matched`, and the SHA-256 digest of the sorted changed-path list.
 
-## Applicability map
+For an applicable decision, every selected guard must be present and explicitly `success`. `missing`, `skipped`, `cancelled`, `neutral`, `timed_out`, `action_required`, and any other value are non-success. The state value is preserved in evidence; `cancelled` is not relabelled as `skipped`.
 
-`path-to-guard.json` is the authoritative path-to-guard map. Its own changes, the fixture contract, the future checker, `validate.yaml`, and the Chart lockfile are control-plane changes: they select every required offline guard. Normal paths select every matching listed rule. A non-match produces a `not_applicable` result with the baseline SHA, a SHA-256 digest of the sorted changed-path list, and `no_path_rule_matched`; it is never represented as an opaque GitHub skip.
+## Validation Summary boundary
 
-The checker is intentionally offline: it reads only versioned JSON and its fixture argument, and calls no cluster, secret store, cloud API, or mutable remote dependency.
+The workflow Summary enumerates its seven current required workflow jobs and fails when a required job is absent or its `needs.<job>.result` differs from `success`. It is deliberately independent of branch protection or rulesets. The known external limitation remains: required-check/ruleset inspection is unavailable to the App, so the external blocking configuration is not asserted here.
 
 ## Fixtures and evidence
 
-Run the local contract test suite:
+Run:
 
-```bash
-python3 -m unittest tests/test_offline_guard_contract.py -v
-```
+    PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_offline_guard_contract.py -v
 
-The fixtures demonstrate:
+The GREEN fixtures cover mapped Kustomization, control-plane, and traced `not_applicable` decisions. The RED fixtures cover required guard `missing`, `skipped`, `cancelled`, `neutral`, `timed_out`, and `action_required` states. `evidence/` contains deterministic checker output for every fixture.
 
-| Fixture | Expected result |
-| --- | --- |
-| `green-mapped-kustomize.json` | A mapped Kustomization path selects the Kustomize render guard and related YAML guards. |
-| `green-control-change.json` | A mapping/control change selects every required guard. |
-| `green-not-applicable.json` | An unmapped path has an explicit, traced `not_applicable` result. |
-| `red-broken-fixture.json` | A deliberately invalid fixture fails. |
-| `red-missing-required-guard.json` | A missing required guard fails; skipped/cancelled are treated identically by the checker. |
-
-`evidence/` is the checked-in stdout for each fixture; the test suite verifies it exactly. RED fixtures intentionally return exit code 1. These artifacts are review evidence for a future, separately approved CI integration, not a release verdict.
+All fixtures record the implementation provenance SHA `dae2acc3a27a623b7cd8ee61a5e1b0a4e4decdbd`. This contract is CI/static evidence only; it makes no runtime claim.

@@ -1,9 +1,18 @@
 {
-  "name": "guard-control-change-forces-all-required-guards",
-  "changed_paths": ["ci/offline-guards/path-to-guard.json"],
+  "changed_paths": [
+    ".github/workflows/validate.yaml"
+  ],
   "expected": {
-    "exit_code": 0,
-    "decision": "applicable",
-    "rule": "control-plane"
-  }
+    "exit_code": 0
+  },
+  "guard_statuses": {
+    "actionlint": "success",
+    "kustomize-render": "success",
+    "release-channel-contract": "success",
+    "repository-hygiene": "success",
+    "scope-boundary": "success",
+    "secret-scan": "success",
+    "yaml-lint": "success"
+  },
+  "source_sha": "dae2acc3a27a623b7cd8ee61a5e1b0a4e4decdbd"
 }
