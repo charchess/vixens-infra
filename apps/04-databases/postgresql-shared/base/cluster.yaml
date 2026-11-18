@@ -15,6 +15,13 @@ spec:
       vixens.io/service-binding: "false"
     labels:
       vixens.io/sizing.postgres: SB-large
+      vixens.io/database-role: shared-postgresql
+      vixens.io/database-tier: production
+  managed:
+    services:
+      disabledDefaultServices:
+        - r
+        - ro
   bootstrap:
     initdb:
       database: txo_platform

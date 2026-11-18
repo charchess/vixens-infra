@@ -2,7 +2,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgresql-shared-recovery
+  name: postgresql-shared
   namespace: databases
 spec:
   plugins:
@@ -10,3 +10,4 @@ spec:
       isWALArchiver: true
       parameters:
         barmanObjectName: postgresql-shared-backup
+        serverName: shared-postgresql
