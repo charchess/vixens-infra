@@ -89,6 +89,17 @@ jobs:
             fi
           done
 
+  client0-bootstrap-group-ref-contract:
+    name: Client0 bootstrap group reference contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.11.1
+      - name: Run Client0 bootstrap group reference contract
+        run: node --test apps/60-services/txo-fabric/tenants/hairem/client0-bootstrap-group-ref.test.mjs
+
   release-channel-contract:
     name: Release channel contract
     runs-on: ubuntu-latest
@@ -136,13 +147,14 @@ jobs:
       - kustomize-render
       - scope-boundary
       - release-channel-contract
+      - client0-bootstrap-group-ref-contract
 
     runs-on: ubuntu-latest
     steps:
       - name: Fail closed on a non-success required gate
         env:
           RESULTS: ${{ toJson(needs) }}
-          REQUIRED_GUARDS: '["repository-hygiene","actionlint","yaml-lint","secret-scan","kustomize-render","scope-boundary","release-channel-contract"]'
+          REQUIRED_GUARDS: '["repository-hygiene","actionlint","yaml-lint","secret-scan","kustomize-render","scope-boundary","release-channel-contract","client0-bootstrap-group-ref-contract"]'
         run: |
           python3 - <<'PYTHON'
           import json
