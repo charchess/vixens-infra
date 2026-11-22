@@ -9,7 +9,23 @@ workflow="$root/.github/workflows/validate.yaml"
 
 fail() { printf 'release-channel contract failed: %s\n' "$*" >&2; exit 1; }
 require() { grep -Fq -- "$2" "$1" || fail "missing '$2' in ${1#$root/}"; }
+require_exactly_once() {
+  local file=$1 needle=$2 count
+  count=$(grep -Fxc -- "$needle" "$file" || true)
+  test "$count" = 1 || fail "expected exactly one '$needle' in ${file#$root/}; found $count"
+}
 forbid() { grep -Fq -- "$2" "$1" && fail "forbidden '$2' in ${1#$root/}" || true; }
+forbid_job_if() {
+  local file=$1 job=$2
+  if awk -v job="$job" '
+    $0 == "  " job ":" { in_job=1; next }
+    in_job && /^  [a-z0-9-]+:/ { in_job=0 }
+    in_job && /^    if:/ { found=1 }
+    END { exit found ? 0 : 1 }
+  ' "$file"; then
+    fail "forbidden if bypass in $job"
+  fi
+}
 
 for file in "$dev" "$prod" "$workflow"; do
   test -f "$file" || fail "missing ${file#$root/}"
@@ -50,5 +66,12 @@ forbid "$prod" 'kubectl '
 require "$workflow" 'release-channel-contract:'
 require "$workflow" 'scripts/test-release-channel.sh'
 require "$workflow" '      - release-channel-contract'
+require "$workflow" 'client0-bootstrap-group-ref-contract:'
+require "$workflow" 'Client0 bootstrap group reference contract'
+require_exactly_once "$workflow" '        run: node --test apps/60-services/txo-fabric/tenants/hairem/client0-bootstrap-group-ref.test.mjs'
+require "$workflow" '      - client0-bootstrap-group-ref-contract'
+require "$workflow" '"client0-bootstrap-group-ref-contract"'
+forbid_job_if "$workflow" "client0-bootstrap-group-ref-contract"
+forbid "$workflow" 'continue-on-error:'
 
 printf 'release-channel contract: PASS\n'
