@@ -51,6 +51,7 @@ spec:
     web:
       iamGroups:
         - client0
+      client0BootstrapGroupRef: client0
       domainSuffix: truxonline.com
       ingressClassName: traefik
       tlsClusterIssuer: letsencrypt-prod
