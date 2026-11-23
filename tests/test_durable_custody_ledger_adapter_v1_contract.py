@@ -1,26 +1,171 @@
 import copy
+import json
+import unittest
 from pathlib import Path
-import unittest,yaml
-P=Path(__file__).resolve().parents[1]/'contracts/durable-custody-ledger-adapter-v1.yaml'
-class T(unittest.TestCase):
- def load(self):return yaml.safe_load(P.read_text())['spec']
- def valid(self,s):
-  self.assertEqual(set(s),{'executable','runtimeCapability','metadataRules','forbiddenTokens','operations','casInvariants','terminalStates','guarantees'});self.assertEqual((s['executable'],s['runtimeCapability']),(False,False));self.assertEqual(s['metadataRules'],{'requestId':{'type':'string','pattern':'^[a-z0-9-]{1,64}$'},'ledgerId':{'type':'string','pattern':'^[a-z0-9-]{1,64}$'},'version':{'type':'integer','minimum':0},'state':{'type':'string','enum':['REQUESTED','LEASED','WITNESSED','CLOSED','UNCERTAIN_STORAGE']},'digest':{'type':'string','pattern':'^[a-f0-9]{64}$'},'priorDigest':{'type':'string-or-null','pattern':'^[a-f0-9]{64}$'},'expiresAt':{'type':'integer','minimum':0},'auditOutcome':{'type':'string','pattern':'^[a-z0-9-]{1,64}$'}});self.assertEqual(s['operations'],{'create':{'input':['ledgerId','requestId','expectedVersion','expiresAt'],'output':['version','state','digest'],'pre':['create-only'],'post':['version-0','priorDigest-null']},'lease':{'input':['ledgerId','expectedVersion','expectedHeadDigest','leaseId','expiresAt'],'output':['version','resultHeadDigest','leaseId'],'pre':['atomic-tuple-equality'],'post':['atomic-consume','nonreplay','expiry']},'transition':{'input':['ledgerId','expectedVersion','expectedHeadDigest','nextState'],'output':['resultVersion','state','priorDigest','resultHeadDigest'],'pre':['atomic-tuple-equality','legal-transition'],'post':['exact-next-version','exact-next-head','priorDigest-linkage','stale-concurrent-refusal']},'close':{'input':['ledgerId','expectedVersion','expectedHeadDigest'],'output':['resultVersion','state','resultHeadDigest'],'pre':['atomic-tuple-equality'],'post':['terminal-closure']},'attest':{'input':['owner','contractRevision','vectorDigest','ledgerId','expectedVersion','expectedHeadDigest','leaseId','expiresAt'],'output':['owner','contractRevision','vectorDigest','ledgerId','expectedVersion','resultVersion','resultHeadDigest','eventDigest','consumedLeaseId','auditOutcome','expiresAt','terminalClosed'],'pre':['atomic-tuple-equality','lease-expiry'],'post':['self-verifiable','lease-consumed','terminal-closure']}});self.assertEqual(s['forbiddenTokens'],['secret','credential','auth','ca','spki','policy','provider','transport','command','argument','log','rawError','payload','recovery','root','share','password','key','jwt']);self.assertEqual(s['casInvariants'],{'atomicTuple':['expectedVersion','expectedHeadDigest'],'createOnlyCollision':'refuse','nextVersion':'exact','nextHead':'exact','priorDigest':'exact','staleConcurrent':'refuse','lease':['atomic-consume','nonreplay','expiry'],'uncertaintyTerminal':'append-only'});self.assertEqual(s['terminalStates'],['CLOSED','UNCERTAIN_STORAGE']);self.assertEqual(s['guarantees'],['persistent','linearizable','append-only','expiry-enforced','uncertainty-terminal','no-further-mutation'])
- def test_closed(self):self.valid(self.load())
- def test_mutation_matrix(self):
-  s=self.load()
-  for key in ['casInvariants','terminalStates']:
-   m=copy.deepcopy(s);m.pop(key)
-   with self.assertRaises(AssertionError):self.valid(m)
-  for key in s['operations']:
-   m=copy.deepcopy(s);m['operations'].pop(key)
-   with self.assertRaises(AssertionError):self.valid(m)
-  for key,rule in s['metadataRules'].items():
-   m=copy.deepcopy(s);m['metadataRules'].pop(key)
-   with self.assertRaises(AssertionError):self.valid(m)
-   for field in rule:
-    m=copy.deepcopy(s);m['metadataRules'][key][field]='mutated'
-    with self.assertRaises(AssertionError):self.valid(m)
-  for token in s['forbiddenTokens']:
-   self.assertIsInstance(token,str)
-if __name__=='__main__':unittest.main()
+
+import yaml
+
+ROOT = Path(__file__).resolve().parents[1]
+CONTRACT = ROOT / "contracts/durable-custody-ledger-adapter-v1.yaml"
+FIXTURE = ROOT / "tests/fixtures/durable-custody-ledger-adapter-v1.oracle.jcs.json"
+
+
+def jcs(value):
+    # The normative document contains only JSON-native strings, integers, bools,
+    # nulls, arrays and objects; this is RFC 8785-compatible for that domain.
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
+
+
+def load_yaml(path=CONTRACT):
+    with path.open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle)
+
+
+def load_oracle():
+    return json.loads(FIXTURE.read_bytes().decode("utf-8"))
+
+
+def cross_references(candidate):
+    spec = candidate["spec"]
+    assert set(spec) == set(spec["oracle"]["topLevelSpecKeys"])
+    operations = spec["operations"]
+    assert set(operations) == set(spec["oracle"]["requiredOperations"])
+    assert set(spec["fieldRules"]) == set(operations)
+    references = set()
+    for operation, definition in operations.items():
+        fields = spec["fieldRules"][operation]
+        assert set(fields) == {"input", "output", "refusal"}
+        for direction, list_key in (("input", "inputFields"), ("output", "outputFields"), ("refusal", "refusalFields")):
+            assert set(definition[list_key]) == set(fields[direction])
+            for binding in fields[direction].values():
+                assert set(binding) == set(spec["fieldRuleShape"]["requiredKeys"])
+                assert binding["scalarRule"] in spec["scalarRules"]
+                references.add(binding["scalarRule"])
+    assert references == set(spec["scalarRules"])
+    states = spec["scalarRules"]["state"]["enum"]
+    assert set(spec["transitionTable"]) == set(states)
+    for state, next_states in spec["transitionTable"].items():
+        assert all(item in states for item in next_states)
+
+
+def valid(candidate):
+    try:
+        oracle = load_oracle()
+        if candidate != oracle:
+            return False
+        if jcs(candidate) != FIXTURE.read_bytes():
+            return False
+        cross_references(candidate)
+        return True
+    except (AssertionError, KeyError, TypeError, ValueError):
+        return False
+
+
+def walk(value, path=()):
+    yield path, value
+    if isinstance(value, dict):
+        for key, child in value.items():
+            yield from walk(child, path + (key,))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            yield from walk(child, path + (index,))
+
+
+def at(root, path):
+    for part in path:
+        root = root[part]
+    return root
+
+
+def changed(value):
+    if value is None:
+        return "not-null"
+    if type(value) is bool:
+        return not value
+    if type(value) is int:
+        return value + 1
+    if type(value) is str:
+        return value + "-mutated"
+    raise TypeError(type(value))
+
+
+class DurableCustodyLedgerAdapterV1ContractTests(unittest.TestCase):
+    def test_canonical_contract_fixture_and_cross_references_are_exact(self):
+        contract = load_yaml()
+        self.assertEqual(contract, load_oracle())
+        self.assertEqual(jcs(contract), FIXTURE.read_bytes())
+        cross_references(contract)
+        self.assertTrue(valid(contract))
+
+    def test_every_recursive_map_list_and_scalar_mutation_is_rejected(self):
+        canonical = load_oracle()
+        self.assertTrue(valid(canonical))
+        cases = 0
+        for path, node in list(walk(canonical)):
+            if not path:
+                continue
+            parent_path, leaf = path[:-1], path[-1]
+            if isinstance(node, dict):
+                for key in list(node):
+                    mutated = copy.deepcopy(canonical)
+                    del at(mutated, path)[key]
+                    self.assertFalse(valid(mutated), (path, "remove", key)); cases += 1
+                    mutated = copy.deepcopy(canonical)
+                    at(mutated, path)[key + "Unknown"] = copy.deepcopy(node[key])
+                    self.assertFalse(valid(mutated), (path, "add", key)); cases += 1
+                    mutated = copy.deepcopy(canonical)
+                    value = at(mutated, path).pop(key)
+                    at(mutated, path)[key + "Renamed"] = value
+                    self.assertFalse(valid(mutated), (path, "rename", key)); cases += 1
+                for replacement in ("invalid", [], None):
+                    mutated = copy.deepcopy(canonical)
+                    target = at(mutated, parent_path)
+                    target[leaf] = replacement
+                    self.assertFalse(valid(mutated), (path, "replace-map")); cases += 1
+            elif isinstance(node, list):
+                for index in range(len(node)):
+                    mutated = copy.deepcopy(canonical); del at(mutated, path)[index]
+                    self.assertFalse(valid(mutated), (path, "remove", index)); cases += 1
+                    mutated = copy.deepcopy(canonical); at(mutated, path).insert(index, copy.deepcopy(node[index]))
+                    self.assertFalse(valid(mutated), (path, "duplicate", index)); cases += 1
+                    mutated = copy.deepcopy(canonical); at(mutated, path)[index] = changed(node[index]) if not isinstance(node[index], (dict, list)) else None
+                    self.assertFalse(valid(mutated), (path, "replace", index)); cases += 1
+                mutated = copy.deepcopy(canonical); at(mutated, path).append("unknown")
+                self.assertFalse(valid(mutated), (path, "append")); cases += 1
+                mutated = copy.deepcopy(canonical); at(mutated, path).reverse()
+                if len(node) > 1:
+                    self.assertFalse(valid(mutated), (path, "reverse")); cases += 1
+                for replacement in ({}, "invalid", None):
+                    mutated = copy.deepcopy(canonical); at(mutated, parent_path)[leaf] = replacement
+                    self.assertFalse(valid(mutated), (path, "replace-list")); cases += 1
+            elif not isinstance(node, (dict, list)):
+                mutated = copy.deepcopy(canonical); at(mutated, parent_path)[leaf] = changed(node)
+                self.assertFalse(valid(mutated), (path, "same-type")); cases += 1
+                mutated = copy.deepcopy(canonical); at(mutated, parent_path)[leaf] = []
+                self.assertFalse(valid(mutated), (path, "invalid-type")); cases += 1
+                if node is not None:
+                    mutated = copy.deepcopy(canonical); at(mutated, parent_path)[leaf] = None
+                    self.assertFalse(valid(mutated), (path, "null")); cases += 1
+        self.assertGreater(cases, 0)
+
+    def test_binding_specific_mutations_and_cross_reference_breaks_are_rejected(self):
+        canonical = load_oracle()
+        for operation, sections in canonical["spec"]["fieldRules"].items():
+            for section, bindings in sections.items():
+                for field in list(bindings):
+                    for key, replacement in (("scalarRule", "unknown"), ("required", not bindings[field]["required"]), ("nullable", not bindings[field]["nullable"]), ("immutable", not bindings[field]["immutable"]), ("role", "mutated-role")):
+                        mutated = copy.deepcopy(canonical); mutated["spec"]["fieldRules"][operation][section][field][key] = replacement
+                        self.assertFalse(valid(mutated), (operation, section, field, key))
+                    mutated = copy.deepcopy(canonical); del mutated["spec"]["fieldRules"][operation][section][field]
+                    self.assertFalse(valid(mutated), (operation, section, field, "remove-binding"))
+                    mutated = copy.deepcopy(canonical); mutated["spec"]["fieldRules"][operation][section][field]["unknown"] = True
+                    self.assertFalse(valid(mutated), (operation, section, field, "unknown-key"))
+        scalar = next(iter(canonical["spec"]["scalarRules"]))
+        mutated = copy.deepcopy(canonical); del mutated["spec"]["scalarRules"][scalar]
+        self.assertFalse(valid(mutated))
+        mutated = copy.deepcopy(canonical); mutated["spec"]["scalarRules"]["unreferenced"] = copy.deepcopy(mutated["spec"]["scalarRules"][scalar])
+        self.assertFalse(valid(mutated))
+
+
+if __name__ == "__main__":
+    unittest.main()
