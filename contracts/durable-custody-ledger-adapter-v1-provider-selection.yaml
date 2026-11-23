@@ -1,0 +1,20 @@
+apiVersion: custody.truxonline.io/v1
+kind: DurableCustodyLedgerAdapterV1OperationalQualification
+metadata:
+  name: durable-custody-ledger-adapter-v1-provider-selection
+spec:
+  executable: false
+  runtimeCapability: false
+  pr132ContractPath: contracts/durable-custody-ledger-adapter-v1.yaml
+  pr132Interface: [createLedger, acquireLease, compareAndAppend, readVerifiedChain, closeLease]
+  conformanceAttestation:
+    allowedFields: [contractDigest, vectorDigest, scope, outcome, reportDigest]
+    additionalProperties: false
+  isolationAttestation:
+    allowedFields: [contractDigest, scope, outcome, reportDigest]
+    additionalProperties: false
+  prohibitedSurfaces: [backend-selection, backend-configuration, backend-provisioning, url, identity, credential, adapter-implementation, runner, openbao, kubernetes, argo, gitops]
+  qualification:
+    providerSelection: prohibited
+    requiredReport: provider-selection-decision-record
+    gate: independent-architecture-and-risk-review
