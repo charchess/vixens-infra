@@ -20,6 +20,7 @@ resources:
   - apps/reloader.yaml
   - apps/hubble-ui.yaml
   - apps/traefik-dashboard.yaml
+  - apps/txo-fabric-openbao-v2-phase1.yaml
   - apps/whoami.yaml
   - apps/snmp-exporter.yaml
   - apps/grafana-ingress.yaml
