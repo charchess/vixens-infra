@@ -1,3 +1,5 @@
+import hashlib
+import json
 import unittest
 from pathlib import Path
 import yaml
@@ -22,4 +24,27 @@ class DurableCustodyLedgerOperationalQualificationTests(unittest.TestCase):
   self.assertEqual(load(CONTRACTS["provider-selection"])["spec"]["qualification"],{"providerSelection":"prohibited","requiredReport":"provider-selection-decision-record","gate":"independent-architecture-and-risk-review"})
   self.assertEqual(load(CONTRACTS["operational-qualification"])["spec"]["qualification"],{"operationalExecution":"prohibited","requiredReports":["conformance-report","isolation-report","operational-gate-report"],"gate":"independent-qa-and-runtime-authorization"})
   self.assertEqual(load(CONTRACTS["recovery-retention"])["spec"]["qualification"],{"recoveryExecution":"prohibited","retentionExecution":"prohibited","requiredReports":["recovery-policy-report","retention-policy-report","operational-gate-report"],"gate":"independent-risk-and-retention-authorization"})
+ def test_pr132_artifacts_and_binding_are_consistent_and_reject_mutations(self):
+  contract = ROOT / "contracts/durable-custody-ledger-adapter-v1.yaml"
+  fixture = ROOT / "tests/fixtures/durable-custody-ledger-adapter-v1.oracle.jcs.json"
+  provenance = ROOT / "tests/fixtures/durable-custody-ledger-adapter-v1.provenance.yaml"
+  raw, jcs, prov = contract.read_bytes(), fixture.read_bytes(), load(provenance)
+  self.assertEqual(hashlib.sha256(raw).hexdigest(), BINDING["contractRawYamlSha256"])
+  self.assertEqual(hashlib.sha256(jcs).hexdigest(), BINDING["canonicalJcsSha256"])
+  self.assertEqual(prov["kind"], BINDING["provenanceIdentity"])
+  self.assertEqual(prov["contractRawSha256"], BINDING["contractRawYamlSha256"])
+  self.assertEqual(prov["canonicalJcsRawSha256"], BINDING["canonicalJcsSha256"])
+  parsed = yaml.safe_load(raw)
+  self.assertEqual(json.dumps(parsed, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode(), jcs)
+  for field in ("contractRawYamlSha256", "canonicalJcsSha256"):
+   changed = dict(BINDING); changed[field] = "0" * 64
+   self.assertNotEqual(changed, BINDING)
+  for artifact in (raw + b" ", jcs + b" "):
+   self.assertNotEqual(hashlib.sha256(artifact).hexdigest(), BINDING["contractRawYamlSha256"])
+  for path in CONTRACTS.values():
+   binding = load(path)["spec"]["pr132Binding"]
+   self.assertEqual(binding, BINDING)
+   for field in ("contractRawYamlSha256", "canonicalJcsSha256"):
+    changed = dict(binding); changed[field] = "f" * 64
+    self.assertNotEqual(changed, BINDING)
 if __name__ == "__main__": unittest.main()
