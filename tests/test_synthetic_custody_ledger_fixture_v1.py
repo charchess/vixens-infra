@@ -19,4 +19,22 @@ class T(unittest.TestCase):
   ts=[threading.Thread(target=go) for _ in range(2)];[t.start() for t in ts];[t.join() for t in ts];self.assertEqual(len(wins),1)
   for q in [{},dict(p(),expiresAt=0),dict(p(),ledgerId='BAD'),dict(p(),extra=1)]:
    with self.assertRaises(x.Refusal):x.SyntheticCustodyLedgerFixture().create(q,0)
-if __name__=='__main__':unittest.main()
+ def test_type_matrix_and_concurrent_transition(self):
+  class S(str):pass
+  l=x.SyntheticCustodyLedgerFixture();l.create(p(),0);wins=[];fails=[]
+  def go():
+   try:l.transition('ledger-1',0,'LEASED',1);wins.append(1)
+   except x.Refusal:fails.append(1)
+  ts=[threading.Thread(target=go) for _ in range(2)];[t.start() for t in ts];[t.join() for t in ts];self.assertEqual((len(wins),len(fails),len(l._l['ledger-1'])),(1,1,2))
+  for args in [(S('ledger-1'),0,'LEASED',1,False),('ledger-1',True,'LEASED',1,False),('ledger-1',1,S('CLOSED'),1,False),('ledger-1',1,'CLOSED',True,False),('ledger-1',1,'CLOSED',1,1)]:
+   before=len(l._l['ledger-1'])
+   with self.assertRaises(x.Refusal):l.transition(*args)
+   self.assertEqual(len(l._l['ledger-1']),before)
+  for q,n,u in [(p(),True,False),(p(),0,1),(S('bad'),0,False)]:
+   with self.assertRaises(x.Refusal):x.SyntheticCustodyLedgerFixture().create(q,n,u)
+ def test_uncertain_refusal_no_event_after_closed_stale_expiry(self):
+  l=x.SyntheticCustodyLedgerFixture();l.create(p(),0);l.transition('ledger-1',0,'CLOSED',1)
+  for expected,now in [(1,1),(0,1),(1,10)]:
+   before=len(l._l['ledger-1'])
+   with self.assertRaises(x.Refusal):l.transition('ledger-1',expected,'LEASED',now,True)
+   self.assertEqual(len(l._l['ledger-1']),before)
