@@ -2,16 +2,19 @@
 import hashlib
 class Refusal(Exception): pass
 ENVELOPE={'endpoint':'https://openbao-fabric-v2.txo-fabric-system.svc:8200','sni':'openbao-fabric-v2.txo-fabric-system.svc','window':1800,'threshold':3,'shares':5}
-FORBIDDEN={'token','credential','share','caDer','rootToken','command'}
+FORBIDDEN={'token','credential','share','caDer','rootToken','recoveryKey','wrappedPayload','policyBody','providerPayload','command','arguments','logs','rawError'}
 def parse_envelope(value):
  if set(value)!=set(ENVELOPE) or value!=ENVELOPE:raise Refusal('closed envelope')
  return dict(value)
 class FakeCA:
- def resolve(self,der):
-  if hashlib.sha256(der).hexdigest()!='85e106a9143f39d1f62180b50878a3ae012992ea0998660581f3b874a3bd7421':raise Refusal('TLS mismatch')
+ def __init__(self):self.calls=0
+ def resolve(self,synthetic_fixture):
+  self.calls+=1
+  if synthetic_fixture!='SYNTHETIC_NON_GOVERNED_TLS_FIXTURE':raise Refusal('TLS mismatch')
 class FakeLedger:
- def __init__(self,mode='ok'):self.mode=mode;self.created=False
+ def __init__(self,mode='ok'):self.mode=mode;self.created=False;self.calls=0
  def create_v0(self):
+  self.calls+=1
   if self.mode in ('collision','crash','timeout') or self.created:raise Refusal(self.mode)
   self.created=True
 class FakeWitness:
