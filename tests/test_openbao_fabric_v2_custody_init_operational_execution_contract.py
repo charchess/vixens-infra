@@ -5,14 +5,15 @@ P=Path(__file__).resolve().parents[1]/'contracts/openbao-fabric-v2-custody-init-
 class T(unittest.TestCase):
  def load(self):return yaml.safe_load(P.read_text())['spec']
  def valid(self,s):
-  self.assertEqual(set(s),{'executable','runtimeCapability','gitOpsConsumer','executionEnvelope','identities','caDerResolver','externalMetadataCasLedger','witnessAttestation','oneShotInvocationReceipt','stateMachine','noGo'})
-  self.assertEqual([s[x] for x in ('executable','runtimeCapability','gitOpsConsumer')],[False,False,False]);e=s['executionEnvelope'];self.assertEqual(e['maxWindowSeconds'],1800);self.assertEqual(e['shamir'],{'threshold':3,'shares':5});self.assertEqual(e['trustAnchorType'],'ca-root-der');self.assertEqual(len(e['trustAnchorSHA256']),64)
-  self.assertEqual(set(s['identities']),{'runner','operator','issuer','witness','pairwiseDistinct'});self.assertTrue(s['identities']['pairwiseDistinct']);self.assertEqual(len({s['identities'][x] for x in ('runner','operator','issuer','witness')}),4)
-  self.assertEqual(s['externalMetadataCasLedger']['interface'],'append-only-cas');self.assertEqual(s['stateMachine']['expiryState'],'STOPPED_UNKNOWN');self.assertFalse(s['stateMachine']['retryAllowed']);self.assertIn('openbao-runtime',s['noGo'])
+  self.assertEqual(set(s),{'executable','runtimeCapability','gitOpsConsumer','fabricBinding','transport','window','roles','caResolver','ledger','witness','oneShotAuthorization','stateMachine','noGo'});self.assertEqual([s[x] for x in ('executable','runtimeCapability','gitOpsConsumer')],[False]*3)
+  self.assertEqual(s['fabricBinding'],{'repository':'charchess/vixens-fabric','revision':'89d23b3e2b2011b53f21c605714beffb974e3d49'});self.assertEqual(s['transport'],{'endpoint':'https://openbao-fabric-v2.txo-fabric-system.svc:8200','serverName':'openbao-fabric-v2.txo-fabric-system.svc','trustAnchorType':'ca-root-der','trustAnchorSHA256':'85e106a9143f39d1f62180b50878a3ae012992ea0998660581f3b874a3bd7421'});self.assertEqual(s['window'],{'maxSeconds':1800,'terminalError':'STOPPED_UNKNOWN','timeout':'STOPPED_UNKNOWN'})
+  self.assertEqual(s['roles'],{'runner':'urn:truxonline:openbao-fabric-v2-custody:role:infra-custody-init-runner:v1','operator':'urn:truxonline:openbao-fabric-v2-custody:role:electra-runtime-operator:v1','issuer':'urn:truxonline:openbao-fabric-v2-custody:role:infra-custody-issuer:v1','witness':'urn:truxonline:openbao-fabric-v2-custody:role:lisa-independent-witness:v1'});self.assertEqual(len(set(s['roles'].values())),4);self.assertEqual(s['caResolver'],{'governedSource':'existing-governed-ca-resolver-required','identity':'existing-governed-ca-resolver-identity-required','storage':'memory-only','sequence':['exact-digest','tls','san','sni'],'terminal':'STOPPED_UNKNOWN'})
+  self.assertEqual(s['ledger'],{'interface':'external-metadata-only-append-only-cas','create':{'expectedVersion':0,'state':'REQUESTED'},'transitionFields':['expectedVersion','state','stateDigest','fabricRevision','trustBinding','roleBindings'],'refuse':['collision','crash','ambiguity']});self.assertEqual(s['witness'],{'verifier':'existing-governed-witness-verifier-required','required':['expiry','nonce','replayConsumption','revocation'],'forbidden':['share','credential','token','payload']});self.assertEqual(s['oneShotAuthorization'],{'required':['casBinding','witnessBinding','fabricBinding','trustBinding','roleBindings','windowBinding'],'retryAllowed':False});self.assertEqual(s['stateMachine']['transitions']['INITIALIZATION_ATTEMPTED'],['UNSEAL_SUCCEEDED','STOPPED_UNKNOWN']);self.assertEqual(s['stateMachine']['terminal'],'CLOSED');self.assertEqual(s['noGo'],['runner','binary','ca-provisioning','ledger-provisioning','witness-provisioning','permission','kubernetes','argo','eso','ci-execution','credential','token','share','openbao-runtime'])
  def test_closed(self):self.valid(self.load())
- def test_refusals(self):
-  for f,v in [('executable',True),('runtimeCapability',True)]:
-   s=copy.deepcopy(self.load());s[f]=v
+ def test_mutations_refused(self):
+  for path,val in [(('transport','endpoint'),'x'),(('window','maxSeconds'),1801),(('roles','witness'),'x'),(('caResolver','storage'),'disk'),(('ledger','interface'),'x'),(('witness','verifier'),'x'),(('oneShotAuthorization','retryAllowed'),True)]:
+   s=copy.deepcopy(self.load());s[path[0]][path[1]]=val
    with self.assertRaises(AssertionError):self.valid(s)
-  for nested,key in [('caDerResolver','caDer'),('externalMetadataCasLedger','share'),('witnessAttestation','token'),('oneShotInvocationReceipt','rootToken')]:self.assertIn(key,self.load()[nested]['forbiddenFields'])
+  s=copy.deepcopy(self.load());s['noGo'].append('extra')
+  with self.assertRaises(AssertionError):self.valid(s)
 if __name__=='__main__':unittest.main()

@@ -1,45 +1,21 @@
 apiVersion: custody.truxonline.io/v1alpha1
 kind: OpenBaoFabricV2CustodyInitOperationalExecutionContract
-metadata:
-  name: openbao-fabric-v2-custody-init-operational-execution
+metadata: {name: openbao-fabric-v2-custody-init-operational-execution}
 spec:
   executable: false
   runtimeCapability: false
   gitOpsConsumer: false
-  executionEnvelope:
-    version: v1
-    endpoint: https://openbao-fabric-v2.txo-fabric-system.svc:8200
-    serverName: openbao-fabric-v2.txo-fabric-system.svc
-    trustAnchorType: ca-root-der
-    trustAnchorSHA256: 85e106a9143f39d1f62180b50878a3ae012992ea0998660581f3b874a3bd7421
-    maxWindowSeconds: 1800
-    shamir: {threshold: 3, shares: 5}
-  identities:
+  fabricBinding: {repository: charchess/vixens-fabric, revision: 89d23b3e2b2011b53f21c605714beffb974e3d49}
+  transport: {endpoint: https://openbao-fabric-v2.txo-fabric-system.svc:8200, serverName: openbao-fabric-v2.txo-fabric-system.svc, trustAnchorType: ca-root-der, trustAnchorSHA256: 85e106a9143f39d1f62180b50878a3ae012992ea0998660581f3b874a3bd7421}
+  window: {maxSeconds: 1800, terminalError: STOPPED_UNKNOWN, timeout: STOPPED_UNKNOWN}
+  roles:
     runner: urn:truxonline:openbao-fabric-v2-custody:role:infra-custody-init-runner:v1
     operator: urn:truxonline:openbao-fabric-v2-custody:role:electra-runtime-operator:v1
     issuer: urn:truxonline:openbao-fabric-v2-custody:role:infra-custody-issuer:v1
     witness: urn:truxonline:openbao-fabric-v2-custody:role:lisa-independent-witness:v1
-    pairwiseDistinct: true
-  caDerResolver:
-    requestAllowedFields: [trustAnchorType, trustAnchorSHA256, endpoint, serverName]
-    receiptAllowedFields: [trustAnchorType, trustAnchorSHA256, endpoint, serverName, resolved, auditOutcome]
-    forbiddenFields: [caDer, credential, token, privateKey]
-  externalMetadataCasLedger:
-    interface: append-only-cas
-    allowedFields: [requestId, expectedVersion, version, state, endpointIdentity, auditOutcome, expiresAt]
-    forbiddenFields: [share, credential, token, caDer, payload]
-  witnessAttestation:
-    allowedFields: [requestId, version, witnessIdentity, custodyAttribution, auditOutcome, expiresAt]
-    forbiddenFields: [share, credential, token, payload]
-  oneShotInvocationReceipt:
-    allowedFields: [requestId, version, state, endpointIdentity, custodyAttribution, auditOutcome, revoked, expiresAt]
-    forbiddenFields: [share, credential, token, rootToken, wrappedPayload]
-  stateMachine:
-    initial: requested
-    transitions: {requested: [witnessed], witnessed: [initialized], initialized: [revoked], revoked: []}
-    terminal: revoked
-    expiryState: STOPPED_UNKNOWN
-    retryAllowed: false
-    secondInitAllowed: false
-    shareReuseAllowed: false
+  caResolver: {governedSource: existing-governed-ca-resolver-required, identity: existing-governed-ca-resolver-identity-required, storage: memory-only, sequence: [exact-digest, tls, san, sni], terminal: STOPPED_UNKNOWN}
+  ledger: {interface: external-metadata-only-append-only-cas, create: {expectedVersion: 0, state: REQUESTED}, transitionFields: [expectedVersion, state, stateDigest, fabricRevision, trustBinding, roleBindings], refuse: [collision, crash, ambiguity]}
+  witness: {verifier: existing-governed-witness-verifier-required, required: [expiry, nonce, replayConsumption, revocation], forbidden: [share, credential, token, payload]}
+  oneShotAuthorization: {required: [casBinding, witnessBinding, fabricBinding, trustBinding, roleBindings, windowBinding], retryAllowed: false}
+  stateMachine: {initial: REQUESTED, transitions: {REQUESTED: [WITNESSED], WITNESSED: [INITIALIZATION_ATTEMPTED], INITIALIZATION_ATTEMPTED: [UNSEAL_SUCCEEDED, STOPPED_UNKNOWN], UNSEAL_SUCCEEDED: [CLOSED], STOPPED_UNKNOWN: [CLOSED], CLOSED: []}, terminal: CLOSED}
   noGo: [runner, binary, ca-provisioning, ledger-provisioning, witness-provisioning, permission, kubernetes, argo, eso, ci-execution, credential, token, share, openbao-runtime]
