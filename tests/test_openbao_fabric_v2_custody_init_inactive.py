@@ -17,7 +17,13 @@ class T(unittest.TestCase):
   a=self.adapters()
   with self.assertRaises(i.Refusal):i.inactive_fixture(R,*a,TRUST,expires=1801)
   self.zero(a)
+  a=self.adapters()
+  with self.assertRaises(i.Refusal):i.inactive_fixture({'envelope':dict(i.ENVELOPE,endpoint='x'),'witness':True},*a,TRUST)
+  self.zero(a)
  def test_exact_synthetic_trust_only(self):
-  for value in ('', 'fake', 'ca-root-der', b'SYNTHETIC_NON_GOVERNED_TLS_FIXTURE'):
+  class S(str):pass
+  class Spoof:
+   def __eq__(self,other):return True
+  for value in ('', 'fake', 'ca-root-der', b'SYNTHETIC_NON_GOVERNED_TLS_FIXTURE',S(TRUST),Spoof()):
    with self.assertRaises(i.Refusal):i.FakeCA().resolve(value)
 if __name__=='__main__':unittest.main()

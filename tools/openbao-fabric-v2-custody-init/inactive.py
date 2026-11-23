@@ -10,7 +10,7 @@ class FakeCA:
  def __init__(self):self.calls=0
  def resolve(self,synthetic_fixture):
   self.calls+=1
-  if synthetic_fixture!='SYNTHETIC_NON_GOVERNED_TLS_FIXTURE':raise Refusal('TLS mismatch')
+  if type(synthetic_fixture) is not str or synthetic_fixture!='SYNTHETIC_NON_GOVERNED_TLS_FIXTURE':raise Refusal('TLS mismatch')
 class FakeLedger:
  def __init__(self,mode='ok'):self.mode=mode;self.created=False;self.calls=0
  def create_v0(self):
