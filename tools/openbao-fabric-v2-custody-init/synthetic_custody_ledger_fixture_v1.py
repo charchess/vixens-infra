@@ -1,5 +1,5 @@
 """SyntheticCustodyLedgerFixture v1: source-only deterministic in-memory fixture."""
-import hashlib,json,re,threading
+import hashlib,json,re,threading,copy
 class Refusal(Exception):pass
 class UncertainStorage(Refusal):pass
 TRANS={'REQUESTED':{'LEASED','CLOSED'},'LEASED':{'WITNESSED','UNCERTAIN_STORAGE','CLOSED'},'WITNESSED':{'CLOSED'},'UNCERTAIN_STORAGE':set(),'CLOSED':set()}; TERMINAL={'UNCERTAIN_STORAGE','CLOSED'}
@@ -13,7 +13,7 @@ class SyntheticCustodyLedgerFixture:
   if not valid(p) or p['expiresAt']<=now:raise Refusal('closed genesis')
   with self._lock:
    if p['ledgerId'] in self._l:raise Refusal('CAS')
-   e={'kind':'genesis','version':0,'state':'REQUESTED','payload':p,'priorDigest':None};e['digest']=digest('genesis',e);self._l[p['ledgerId']]=[e];return e.copy()
+   payload=copy.deepcopy(p);e={'kind':'genesis','version':0,'state':'REQUESTED','payload':payload,'priorDigest':None};e['digest']=digest('genesis',e);self._l[p['ledgerId']]=[e];return copy.deepcopy(e)
  def transition(self,lid,expected,next_state,now,uncertain=False):
   if type(lid) is not str or type(expected) is not int or type(next_state) is not str or type(now) is not int or type(uncertain) is not bool:raise Refusal('closed boundary')
   with self._lock:
@@ -21,7 +21,7 @@ class SyntheticCustodyLedgerFixture:
    if uncertain:
     if not es:raise Refusal('missing')
     last=es[-1]
-    if type(expected)is not int or type(now)is not int or type(next_state)is not str or last['version']!=expected or last['payload']['expiresAt']<=now or last['state'] in TERMINAL:raise Refusal('CAS/expiry/terminal')
+    if type(expected)is not int or type(now)is not int or type(next_state)is not str or last['version']!=expected or last['payload']['expiresAt']<=now or last['state'] in TERMINAL or next_state not in TRANS[last['state']]:raise Refusal('CAS/expiry/terminal')
     e={'kind':'event','version':last['version']+1,'state':'UNCERTAIN_STORAGE','payload':last['payload'],'priorDigest':last['digest']};e['digest']=digest('event',e,last['digest']);es.append(e)
     raise UncertainStorage('UNCERTAIN_STORAGE')
    if not es:raise Refusal('missing')

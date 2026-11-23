@@ -38,3 +38,9 @@ class T(unittest.TestCase):
    before=len(l._l['ledger-1'])
    with self.assertRaises(x.Refusal):l.transition('ledger-1',expected,'LEASED',now,True)
    self.assertEqual(len(l._l['ledger-1']),before)
+ def test_copy_isolation_and_uncertain_illegal_state(self):
+  l=x.SyntheticCustodyLedgerFixture();q=p();g=l.create(q,0);q['expiresAt']=999;g['payload']['expiresAt']=999
+  self.assertEqual(l._l['ledger-1'][0]['payload']['expiresAt'],10)
+  before=len(l._l['ledger-1'])
+  with self.assertRaises(x.Refusal):l.transition('ledger-1',0,'BAD',1,True)
+  self.assertEqual(len(l._l['ledger-1']),before)
