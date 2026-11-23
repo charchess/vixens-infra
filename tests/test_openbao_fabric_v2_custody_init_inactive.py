@@ -10,7 +10,7 @@ class T(unittest.TestCase):
   a=self.adapters();x=i.inactive_fixture(R,*a,TRUST);self.assertEqual(x,{'state':'CLOSED','secretPersisted':False});self.assertEqual((a[0].calls,a[1].calls,a[2].calls),(1,1,1))
  def test_pre_adapter_refusals_zero_calls(self):
   cases=[dict(R,token='x'),dict(R,credential='x'),dict(R,share='x'),dict(R,caDer='x'),dict(R,rootToken='x'),dict(R,recoveryKey='x'),dict(R,wrappedPayload='x'),dict(R,policyBody='x'),dict(R,providerPayload='x'),dict(R,command='x'),dict(R,arguments='x'),dict(R,logs='x'),dict(R,rawError='x')]
-  for r in cases:
+  for r in cases+[{}, {'envelope':i.ENVELOPE}, {'witness':True}, dict(R,witness=1),dict(R,extra=True)]:
    a=self.adapters()
    with self.assertRaises(i.Refusal):i.inactive_fixture(r,*a,TRUST)
    self.zero(a)
@@ -20,6 +20,10 @@ class T(unittest.TestCase):
   a=self.adapters()
   with self.assertRaises(i.Refusal):i.inactive_fixture({'envelope':dict(i.ENVELOPE,endpoint='x'),'witness':True},*a,TRUST)
   self.zero(a)
+  for mode in ('collision','crash','timeout'):
+   a=[*self.adapters()];a[1]=i.FakeLedger(mode)
+   with self.assertRaises(i.Refusal):i.inactive_fixture(R,*a,TRUST)
+   self.assertEqual((a[0].calls,a[1].calls,a[2].calls),(1,1,0))
  def test_exact_synthetic_trust_only(self):
   class S(str):pass
   class Spoof:

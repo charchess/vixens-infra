@@ -23,5 +23,6 @@ class FakeWitness:
   self.calls+=1
   if not present or expired:raise Refusal('witness/authorization refused')
 def inactive_fixture(request,ca,ledger,witness,der,now=0,expires=1800):
+ if set(request)!={'envelope','witness'} or type(request['witness']) is not bool:raise Refusal('closed request schema')
  if FORBIDDEN & set(request) or expires-now>1800 or expires<=now:raise Refusal('refused before operation')
  parse_envelope(request['envelope']);ca.resolve(der);ledger.create_v0();witness.attest(request.get('witness',False),request.get('expired',False));return {'state':'CLOSED','secretPersisted':False}
