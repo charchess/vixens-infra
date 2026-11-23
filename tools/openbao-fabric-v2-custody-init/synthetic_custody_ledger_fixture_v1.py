@@ -14,11 +14,14 @@ class SyntheticCustodyLedgerFixture:
   if not valid(p) or p['expiresAt']<=now:raise Refusal('closed genesis')
   with self._lock:
    if p['ledgerId'] in self._l:raise Refusal('CAS')
-   e={'kind':'genesis','version':0,'state':'REQUESTED','payload':p};e['digest']=digest('genesis',e);self._l[p['ledgerId']]=[e];return e.copy()
+   e={'kind':'genesis','version':0,'state':'REQUESTED','payload':p,'priorDigest':None};e['digest']=digest('genesis',e);self._l[p['ledgerId']]=[e];return e.copy()
  def transition(self,lid,expected,next_state,now,uncertain=False):
-  if uncertain:raise UncertainStorage('UNCERTAIN_STORAGE')
   with self._lock:
    es=self._l.get(lid)
+   if uncertain:
+    if es:
+     last=es[-1];e={'kind':'event','version':last['version']+1,'state':'UNCERTAIN_STORAGE','payload':last['payload'],'priorDigest':last['digest']};e['digest']=digest('event',e,last['digest']);es.append(e)
+    raise UncertainStorage('UNCERTAIN_STORAGE')
    if not es:raise Refusal('missing')
    last=es[-1]
    if type(expected)is not int or last['version']!=expected or last['payload']['expiresAt']<=now or next_state not in TRANS[last['state']]:raise Refusal('CAS/transition')
