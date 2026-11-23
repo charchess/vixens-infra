@@ -4,13 +4,22 @@ metadata: {name: durable-custody-ledger-adapter-v1}
 spec:
   executable: false
   runtimeCapability: false
-  scalarMetadata: {allowed: [requestId, ledgerId, version, state, digest, priorDigest, expiresAt, auditOutcome], maxStringLength: 128, digestPattern: '^[a-f0-9]{64}$', forbidNested: true}
+  metadataRules:
+    requestId: {type: string, pattern: '^[a-z0-9-]{1,64}$'}
+    ledgerId: {type: string, pattern: '^[a-z0-9-]{1,64}$'}
+    version: {type: integer, minimum: 0}
+    state: {type: string, enum: [REQUESTED, LEASED, WITNESSED, CLOSED, UNCERTAIN_STORAGE]}
+    digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+    priorDigest: {type: string-or-null, pattern: '^[a-f0-9]{64}$'}
+    expiresAt: {type: integer, minimum: 0}
+    auditOutcome: {type: string, pattern: '^[a-z0-9-]{1,64}$'}
   forbiddenTokens: [secret, credential, auth, ca, spki, policy, provider, transport, command, argument, log, rawError, payload, recovery, root, share, password, key, jwt]
   operations:
-    create: {input: [ledgerId, requestId, expectedVersion, expiresAt], output: [version, state, digest], pre: create-only, post: [version-0, priorDigest-null]}
-    lease: {input: [ledgerId, expectedVersion, headDigest, leaseId, expiresAt], output: [version, headDigest, leaseId], pre: head-equality, post: one-shot-expiry}
-    transition: {input: [ledgerId, expectedVersion, headDigest, nextState], output: [version, state, priorDigest, digest], pre: [sequence-equality, head-equality, legal-transition], post: [next-version, next-head]}
-    close: {input: [ledgerId, expectedVersion, headDigest], output: [version, state, digest], pre: head-equality, post: terminal}
-    attest: {input: [owner, contract, vector, ledgerId, headDigest, leaseId, expiresAt], output: [ledgerId, version, digest, auditOutcome, expiresAt], pre: binding-equality}
+    create: {input: [ledgerId, requestId, expectedVersion, expiresAt], output: [version, state, digest], pre: [create-only], post: [version-0, priorDigest-null]}
+    lease: {input: [ledgerId, expectedVersion, expectedHeadDigest, leaseId, expiresAt], output: [version, resultHeadDigest, leaseId], pre: [atomic-tuple-equality], post: [atomic-consume, nonreplay, expiry]}
+    transition: {input: [ledgerId, expectedVersion, expectedHeadDigest, nextState], output: [resultVersion, state, priorDigest, resultHeadDigest], pre: [atomic-tuple-equality, legal-transition], post: [exact-next-version, exact-next-head, priorDigest-linkage, stale-concurrent-refusal]}
+    close: {input: [ledgerId, expectedVersion, expectedHeadDigest], output: [resultVersion, state, resultHeadDigest], pre: [atomic-tuple-equality], post: [terminal-closure]}
+    attest: {input: [owner, contractRevision, vectorDigest, ledgerId, expectedVersion, expectedHeadDigest, leaseId, expiresAt], output: [owner, contractRevision, vectorDigest, ledgerId, expectedVersion, resultVersion, resultHeadDigest, eventDigest, consumedLeaseId, auditOutcome, expiresAt, terminalClosed], pre: [atomic-tuple-equality, lease-expiry], post: [self-verifiable, lease-consumed, terminal-closure]}
+  casInvariants: {atomicTuple: [expectedVersion, expectedHeadDigest], createOnlyCollision: refuse, nextVersion: exact, nextHead: exact, priorDigest: exact, staleConcurrent: refuse, lease: [atomic-consume, nonreplay, expiry], uncertaintyTerminal: append-only}
   terminalStates: [CLOSED, UNCERTAIN_STORAGE]
   guarantees: [persistent, linearizable, append-only, expiry-enforced, uncertainty-terminal, no-further-mutation]
