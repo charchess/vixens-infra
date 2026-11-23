@@ -131,6 +131,8 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Run OpenBao Fabric v2 custody-init runner fixture
         run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_openbao_fabric_v2_custody_init_runner.py
+      - name: Run TLS fixture helper
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_tls_fixture_helper.py
 
   release-channel-contract:
     name: Release channel contract

@@ -15,6 +15,15 @@ require_exactly_once() {
   test "$count" = 1 || fail "expected exactly one '$needle' in ${file#$root/}; found $count"
 }
 forbid() { grep -Fq -- "$2" "$1" && fail "forbidden '$2' in ${1#$root/}" || true; }
+require_job_exactly_once() {
+  local file=$1 job=$2 needle=$3
+  awk -v job="$job" -v needle="$needle" '
+    $0 == "  " job ":" { in_job=1; next }
+    in_job && /^  [a-z0-9-]+:/ { in_job=0 }
+    in_job && $0 == needle { count++ }
+    END { exit count == 1 ? 0 : 1 }
+  ' "$file" || fail "expected exactly one '$needle' inside $job"
+}
 forbid_job_if() {
   local file=$1 job=$2
   if awk -v job="$job" '
@@ -93,6 +102,9 @@ forbid_job_if "$workflow" "openbao-fabric-v2-custody-init-runner-contract"
 require "$workflow" 'openbao-fabric-v2-custody-init-runner-fixture:'
 require "$workflow" 'OpenBao Fabric v2 custody-init runner fixture'
 require_exactly_once "$workflow" '        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_openbao_fabric_v2_custody_init_runner.py'
+require_exactly_once "$workflow" '        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_tls_fixture_helper.py'
+require_job_exactly_once "$workflow" "openbao-fabric-v2-custody-init-runner-fixture" '        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_openbao_fabric_v2_custody_init_runner.py'
+require_job_exactly_once "$workflow" "openbao-fabric-v2-custody-init-runner-fixture" '        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_tls_fixture_helper.py'
 require "$workflow" '      - openbao-fabric-v2-custody-init-runner-fixture'
 require "$workflow" '"openbao-fabric-v2-custody-init-runner-fixture"'
 forbid_job_if "$workflow" "openbao-fabric-v2-custody-init-runner-fixture"
