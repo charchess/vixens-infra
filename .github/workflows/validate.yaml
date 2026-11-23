@@ -140,6 +140,14 @@ jobs:
       - name: Run OpenBao Fabric v2 custody-init inactive runner
         run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_openbao_fabric_v2_custody_init_inactive.py
 
+  openbao-fabric-v2-custody-ledger-adapter-v1:
+    name: OpenBao Fabric v2 custody ledger adapter v1
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Run OpenBao Fabric v2 custody ledger adapter v1
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_custody_ledger_adapter_v1.py
+
   openbao-fabric-v2-custody-init-runner-fixture:
     name: OpenBao Fabric v2 custody-init runner fixture
     runs-on: ubuntu-latest
@@ -203,6 +211,7 @@ jobs:
       - openbao-fabric-v2-custody-init-runner-contract
       - openbao-fabric-v2-custody-init-operational-execution-contract
       - openbao-fabric-v2-custody-init-inactive-runner
+      - openbao-fabric-v2-custody-ledger-adapter-v1
       - openbao-fabric-v2-custody-init-runner-fixture
 
     runs-on: ubuntu-latest
@@ -210,7 +219,7 @@ jobs:
       - name: Fail closed on a non-success required gate
         env:
           RESULTS: ${{ toJson(needs) }}
-          REQUIRED_GUARDS: '["repository-hygiene","actionlint","yaml-lint","secret-scan","kustomize-render","scope-boundary","release-channel-contract","client0-bootstrap-group-ref-contract","openbao-fabric-v2-phase1-argo-contract","openbao-fabric-v2-phase2-custody-issuer-contract","openbao-fabric-v2-custody-init-runner-contract","openbao-fabric-v2-custody-init-operational-execution-contract","openbao-fabric-v2-custody-init-inactive-runner","openbao-fabric-v2-custody-init-runner-fixture"]'
+          REQUIRED_GUARDS: '["repository-hygiene","actionlint","yaml-lint","secret-scan","kustomize-render","scope-boundary","release-channel-contract","client0-bootstrap-group-ref-contract","openbao-fabric-v2-phase1-argo-contract","openbao-fabric-v2-phase2-custody-issuer-contract","openbao-fabric-v2-custody-init-runner-contract","openbao-fabric-v2-custody-init-operational-execution-contract","openbao-fabric-v2-custody-init-inactive-runner","openbao-fabric-v2-custody-ledger-adapter-v1","openbao-fabric-v2-custody-init-runner-fixture"]'
         run: |
           python3 - <<'PYTHON'
           import json
