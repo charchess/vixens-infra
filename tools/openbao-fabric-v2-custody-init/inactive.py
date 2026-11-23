@@ -18,7 +18,9 @@ class FakeLedger:
   if self.mode in ('collision','crash','timeout') or self.created:raise Refusal(self.mode)
   self.created=True
 class FakeWitness:
+ def __init__(self):self.calls=0
  def attest(self,present,expired=False):
+  self.calls+=1
   if not present or expired:raise Refusal('witness/authorization refused')
 def inactive_fixture(request,ca,ledger,witness,der,now=0,expires=1800):
  if FORBIDDEN & set(request) or expires-now>1800 or expires<=now:raise Refusal('refused before operation')

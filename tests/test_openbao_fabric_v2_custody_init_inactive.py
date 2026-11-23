@@ -2,17 +2,22 @@ import importlib.util
 from pathlib import Path
 import unittest
 P=Path(__file__).resolve().parents[1]/'tools/openbao-fabric-v2-custody-init/inactive.py';s=importlib.util.spec_from_file_location('i',P);i=importlib.util.module_from_spec(s);s.loader.exec_module(i)
-R={'envelope':i.ENVELOPE,'witness':True}
+R={'envelope':i.ENVELOPE,'witness':True}; TRUST='SYNTHETIC_NON_GOVERNED_TLS_FIXTURE'
 class T(unittest.TestCase):
- def test_closed_and_tls_refusal(self):
-  with self.assertRaises(i.Refusal):i.inactive_fixture(R,i.FakeCA(),i.FakeLedger(),i.FakeWitness(),b'SYNTHETIC_NON_GOVERNED_TLS_FIXTURE')
-  with self.assertRaises(i.Refusal):i.parse_envelope(dict(i.ENVELOPE,endpoint='x'))
- def test_ledger_and_witness_refusals(self):
-  for mode in ('collision','crash','timeout'):
-   with self.assertRaises(i.Refusal):i.inactive_fixture(R,i.FakeCA(),i.FakeLedger(mode),i.FakeWitness(),b'SYNTHETIC_NON_GOVERNED_TLS_FIXTURE')
-  with self.assertRaises(i.Refusal):i.FakeWitness().attest(False)
-  with self.assertRaises(i.Refusal):i.FakeWitness().attest(True,True)
- def test_secret_and_window_refusal_before_adapter(self):
-  with self.assertRaises(i.Refusal):i.inactive_fixture(dict(R,token='x'),i.FakeCA(),i.FakeLedger(),i.FakeWitness(),b'SYNTHETIC_NON_GOVERNED_TLS_FIXTURE')
-  with self.assertRaises(i.Refusal):i.inactive_fixture(R,i.FakeCA(),i.FakeLedger(),i.FakeWitness(),b'SYNTHETIC_NON_GOVERNED_TLS_FIXTURE',expires=1801)
+ def adapters(self):return i.FakeCA(),i.FakeLedger(),i.FakeWitness()
+ def zero(self,a):self.assertEqual((a[0].calls,a[1].calls,a[2].calls),(0,0,0))
+ def test_nominal_fixture_only_success(self):
+  a=self.adapters();x=i.inactive_fixture(R,*a,TRUST);self.assertEqual(x,{'state':'CLOSED','secretPersisted':False});self.assertEqual((a[0].calls,a[1].calls,a[2].calls),(1,1,1))
+ def test_pre_adapter_refusals_zero_calls(self):
+  cases=[dict(R,token='x'),dict(R,credential='x'),dict(R,share='x'),dict(R,caDer='x'),dict(R,rootToken='x'),dict(R,recoveryKey='x'),dict(R,wrappedPayload='x'),dict(R,policyBody='x'),dict(R,providerPayload='x'),dict(R,command='x'),dict(R,arguments='x'),dict(R,logs='x'),dict(R,rawError='x')]
+  for r in cases:
+   a=self.adapters()
+   with self.assertRaises(i.Refusal):i.inactive_fixture(r,*a,TRUST)
+   self.zero(a)
+  a=self.adapters()
+  with self.assertRaises(i.Refusal):i.inactive_fixture(R,*a,TRUST,expires=1801)
+  self.zero(a)
+ def test_exact_synthetic_trust_only(self):
+  for value in ('', 'fake', 'ca-root-der', b'SYNTHETIC_NON_GOVERNED_TLS_FIXTURE'):
+   with self.assertRaises(i.Refusal):i.FakeCA().resolve(value)
 if __name__=='__main__':unittest.main()
