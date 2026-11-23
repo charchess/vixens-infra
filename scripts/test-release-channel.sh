@@ -99,6 +99,13 @@ require_exactly_once "$workflow" '        run: python3 -m unittest tests/test_op
 require "$workflow" '      - openbao-fabric-v2-custody-init-runner-contract'
 require "$workflow" '"openbao-fabric-v2-custody-init-runner-contract"'
 forbid_job_if "$workflow" "openbao-fabric-v2-custody-init-runner-contract"
+require "$workflow" 'openbao-fabric-v2-custody-init-operational-execution-contract:'
+require "$workflow" 'OpenBao Fabric v2 custody-init operational execution contract'
+require_exactly_once "$workflow" '        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_openbao_fabric_v2_custody_init_operational_execution_contract.py'
+require_job_exactly_once "$workflow" "openbao-fabric-v2-custody-init-operational-execution-contract" '        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_openbao_fabric_v2_custody_init_operational_execution_contract.py'
+require "$workflow" '      - openbao-fabric-v2-custody-init-operational-execution-contract'
+require "$workflow" '"openbao-fabric-v2-custody-init-operational-execution-contract"'
+forbid_job_if "$workflow" "openbao-fabric-v2-custody-init-operational-execution-contract"
 require "$workflow" 'openbao-fabric-v2-custody-init-runner-fixture:'
 require "$workflow" 'OpenBao Fabric v2 custody-init runner fixture'
 require_exactly_once "$workflow" '        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_openbao_fabric_v2_custody_init_runner.py'
