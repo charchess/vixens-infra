@@ -23,7 +23,7 @@ class Phase2CustodyIssuerContractTest(unittest.TestCase):
         self.assertTrue(spec["requiresExistingAuthenticatedAuthority"])
         self.assertTrue(spec["cannotBootstrapInitialCustodyAlone"])
         self.assertEqual(spec["fabricImmutableVersionBinding"], {"repository": "charchess/vixens-fabric", "revision": FABRIC_SHA, "contractPath": FABRIC_PATH, "requiredSentinel": SENTINEL})
-        self.assertEqual(set(spec["offlineIssuerEnvelope"]), {"material", "policyPayload"})
+        self.assertEqual(spec["offlineIssuerEnvelope"], {"material": "ABSENT_EXISTING_AUTHENTICATED_AUTHORITY_REQUIRED", "policyPayload": "ABSENT_OUT_OF_GIT_CUSTODY_REQUIRED"})
         self.assertEqual(spec["electraDelegationEnvelope"], {"identityRef": "EXISTING_AUTHENTICATED_ELECTRA_RECOVERY_IDENTITY_REQUIRED", "ttlSeconds": 900, "renewable": False, "storage": "memory-only", "wrapped": True})
         self.assertEqual(spec["revokeReceiptSchema"], {"version": "v1", "allowedFields": ["phase", "phaseHash", "fabricRevision", "custodyAttribution", "auditOutcome", "revoked"], "forbiddenFields": ["credential", "token", "wrappedPayload", "policyBody", "providerPayload", "root", "share"]})
         self.assertEqual(set(spec["refusalModel"]), {"refuseMissingAuthority", "refuseRevisionMismatch", "refuseMissingSentinel", "refuseTTLAbove900Seconds", "refuseRenewableOrPersistentOrUnwrappedDelegation", "refuseCredentialOrPayloadMaterial"})
@@ -31,6 +31,13 @@ class Phase2CustodyIssuerContractTest(unittest.TestCase):
 
     def test_contract_is_structurally_closed(self):
         self.validate(self.load())
+
+    def test_offline_issuer_sentinel_substitution_is_refused(self):
+        document = self.load()
+        for key in ("material", "policyPayload"):
+            mutated = copy.deepcopy(document)
+            mutated["spec"]["offlineIssuerEnvelope"][key] = "NON_SENTINEL_VALUE"
+            with self.assertRaises(AssertionError, msg=key): self.validate(mutated)
 
     def test_delegation_property_removal_or_substitution_is_refused(self):
         document = self.load()
