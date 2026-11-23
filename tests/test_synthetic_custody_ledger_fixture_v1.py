@@ -44,3 +44,7 @@ class T(unittest.TestCase):
   before=len(l._l['ledger-1'])
   with self.assertRaises(x.Refusal):l.transition('ledger-1',0,'BAD',1,True)
   self.assertEqual(len(l._l['ledger-1']),before)
+ def test_transition_return_isolation(self):
+  l=x.SyntheticCustodyLedgerFixture();l.create(p(),0);a=l.transition('ledger-1',0,'LEASED',1);b=l.transition('ledger-1',1,'WITNESSED',1);before=[(e['payload']['expiresAt'],e['digest']) for e in l._l['ledger-1']]
+  a['payload']['expiresAt']=999;b['payload']['expiresAt']=998
+  self.assertEqual([(e['payload']['expiresAt'],e['digest']) for e in l._l['ledger-1']],before)

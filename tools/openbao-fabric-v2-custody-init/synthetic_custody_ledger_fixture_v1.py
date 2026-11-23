@@ -22,9 +22,9 @@ class SyntheticCustodyLedgerFixture:
     if not es:raise Refusal('missing')
     last=es[-1]
     if type(expected)is not int or type(now)is not int or type(next_state)is not str or last['version']!=expected or last['payload']['expiresAt']<=now or last['state'] in TERMINAL or next_state not in TRANS[last['state']]:raise Refusal('CAS/expiry/terminal')
-    e={'kind':'event','version':last['version']+1,'state':'UNCERTAIN_STORAGE','payload':last['payload'],'priorDigest':last['digest']};e['digest']=digest('event',e,last['digest']);es.append(e)
+    payload=copy.deepcopy(last['payload']);e={'kind':'event','version':last['version']+1,'state':'UNCERTAIN_STORAGE','payload':payload,'priorDigest':last['digest']};e['digest']=digest('event',e,last['digest']);es.append(e)
     raise UncertainStorage('UNCERTAIN_STORAGE')
    if not es:raise Refusal('missing')
    last=es[-1]
    if type(expected)is not int or last['version']!=expected or last['payload']['expiresAt']<=now or next_state not in TRANS[last['state']]:raise Refusal('CAS/transition')
-   e={'kind':'event','version':expected+1,'state':next_state,'payload':last['payload'],'priorDigest':last['digest']};e['digest']=digest('event',e,last['digest']);es.append(e);return e.copy()
+   payload=copy.deepcopy(last['payload']);e={'kind':'event','version':expected+1,'state':next_state,'payload':payload,'priorDigest':last['digest']};e['digest']=digest('event',e,last['digest']);es.append(e);return copy.deepcopy(e)
