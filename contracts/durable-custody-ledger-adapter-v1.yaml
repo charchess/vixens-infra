@@ -1,0 +1,13 @@
+apiVersion: custody.truxonline.io/v1alpha1
+kind: DurableCustodyLedgerAdapterV1Contract
+metadata: {name: durable-custody-ledger-adapter-v1}
+spec:
+  executable: false
+  runtimeCapability: false
+  allowedInterface: [create, lease, transition, close, attest]
+  requiredMutationFields: [ledgerId, expectedVersion, headDigest, leaseId, expiresAt]
+  guarantees: [persistent, linearizable, append-only, expiry-enforced, uncertainty-terminal]
+  eventSchema: {allowedFields: [ledgerId, version, state, priorDigest, digest, expiresAt, metadata], forbiddenFields: [share, credential, token, rootToken, recoveryKey, payload, url, identity]}
+  attestationSchema: {allowedFields: [ledgerId, version, state, digest, auditOutcome, expiresAt], forbiddenFields: [share, credential, token, payload, signature, endpoint]}
+  forbiddenMethods: [delete, update, replace, query, list, route, client, provision, network]
+  conformanceVectors: {fixture: SyntheticCustodyLedgerFixture/v1, digestDomain: 'SyntheticCustodyLedgerFixture/v1\0', states: [REQUESTED, LEASED, WITNESSED, CLOSED, UNCERTAIN_STORAGE]}
