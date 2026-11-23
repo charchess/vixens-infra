@@ -17,5 +17,9 @@ spec:
   ledger: {interface: external-metadata-only-append-only-cas, create: {expectedVersion: 0, state: REQUESTED}, transitionFields: [expectedVersion, state, stateDigest, fabricRevision, trustBinding, roleBindings], refuse: [collision, crash, ambiguity]}
   witness: {verifier: existing-governed-witness-verifier-required, required: [expiry, nonce, replayConsumption, revocation], forbidden: [share, credential, token, payload]}
   oneShotAuthorization: {required: [casBinding, witnessBinding, fabricBinding, trustBinding, roleBindings, windowBinding], retryAllowed: false}
+  oneShotInvocationReceipt:
+    allowedFields: [requestId, version, state, fabricBinding, endpointIdentity, trustBindingDigest, custodyAttribution, auditOutcome, authorizationConsumed, revokedOrClosed, expiresAt]
+    forbiddenFields: [share, credential, token, rootToken, recoveryKey, wrappedPayload, caDer, policyBody, providerPayload, command, arguments, logs, rawError]
+    requiredBindings: {casVersion: exact, witness: exact, authorizationConsumed: true, state: CLOSED}
   stateMachine: {initial: REQUESTED, transitions: {REQUESTED: [WITNESSED], WITNESSED: [INITIALIZATION_ATTEMPTED], INITIALIZATION_ATTEMPTED: [UNSEAL_SUCCEEDED, STOPPED_UNKNOWN], UNSEAL_SUCCEEDED: [CLOSED], STOPPED_UNKNOWN: [CLOSED], CLOSED: []}, terminal: CLOSED}
   noGo: [runner, binary, ca-provisioning, ledger-provisioning, witness-provisioning, permission, kubernetes, argo, eso, ci-execution, credential, token, share, openbao-runtime]
