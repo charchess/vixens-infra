@@ -1,0 +1,45 @@
+apiVersion: custody.truxonline.io/v1alpha1
+kind: OpenBaoFabricV2CustodyInitRunnerContract
+metadata:
+  name: openbao-fabric-v2-custody-init-runner
+spec:
+  executable: false
+  runtimeCapability: false
+  gitOpsConsumer: false
+  fixedTransportIdentity:
+    endpoint: https://openbao-fabric-v2.txo-fabric-system.svc:8200
+    serverName: openbao-fabric-v2.txo-fabric-system.svc
+    trustIdentity: openbao-fabric-v2-ca
+  shamir:
+    threshold: 3
+    shares: 5
+    material: ABSENT_OUT_OF_GIT_CUSTODY_REQUIRED
+  actors:
+    operatorRole: ELECTRA_EXISTING_AUTHENTICATED_OPERATOR_REQUIRED
+    witnessRole: INDEPENDENT_CUSTODY_WITNESS_REQUIRED
+    distinctOperatorAndWitness: true
+  casStateMachine:
+    initial: requested
+    transitions:
+      requested: [witnessed]
+      witnessed: [initialized]
+      initialized: [revoked]
+      revoked: []
+    terminal: revoked
+  requestSchema:
+    allowedFields: [protocolVersion, fabricRevision, endpointIdentity, shamirThreshold, shamirShares, requestId, expectedVersion]
+  ledgerSchema:
+    allowedFields: [requestId, version, state, fabricRevision, endpointIdentity, operatorAttribution, witnessAttribution, auditOutcome]
+  receiptSchema:
+    allowedFields: [requestId, version, state, fabricRevision, endpointIdentity, custodyAttribution, auditOutcome, revoked]
+  forbiddenPersistence: [credential, token, share, recoveryKey, rootToken, wrappedPayload, policyBody, providerPayload]
+  refusalMatrix:
+    refuseEndpointMismatch: true
+    refuseServerNameMismatch: true
+    refuseTrustIdentityMismatch: true
+    refuseMethodOutsideInitializeOrRevoke: true
+    refuseInvalidTransition: true
+    refuseCASVersionMismatch: true
+    refuseNonThreeOfFive: true
+    refuseSameOperatorAndWitness: true
+    refuseSecretMaterial: true
