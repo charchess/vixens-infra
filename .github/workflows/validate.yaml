@@ -100,6 +100,14 @@ jobs:
       - name: Run Client0 bootstrap group reference contract
         run: node --test apps/60-services/txo-fabric/tenants/hairem/client0-bootstrap-group-ref.test.mjs
 
+  openbao-fabric-v2-phase1-argo-contract:
+    name: OpenBao Fabric v2 Phase1 Argo contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Run OpenBao Fabric v2 Phase1 Argo contract
+        run: python3 -m unittest tests/test_txo_fabric_openbao_v2_phase1_argo.py
+
   release-channel-contract:
     name: Release channel contract
     runs-on: ubuntu-latest
@@ -148,13 +156,14 @@ jobs:
       - scope-boundary
       - release-channel-contract
       - client0-bootstrap-group-ref-contract
+      - openbao-fabric-v2-phase1-argo-contract
 
     runs-on: ubuntu-latest
     steps:
       - name: Fail closed on a non-success required gate
         env:
           RESULTS: ${{ toJson(needs) }}
-          REQUIRED_GUARDS: '["repository-hygiene","actionlint","yaml-lint","secret-scan","kustomize-render","scope-boundary","release-channel-contract","client0-bootstrap-group-ref-contract"]'
+          REQUIRED_GUARDS: '["repository-hygiene","actionlint","yaml-lint","secret-scan","kustomize-render","scope-boundary","release-channel-contract","client0-bootstrap-group-ref-contract","openbao-fabric-v2-phase1-argo-contract"]'
         run: |
           python3 - <<'PYTHON'
           import json

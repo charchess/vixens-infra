@@ -72,6 +72,12 @@ require_exactly_once "$workflow" '        run: node --test apps/60-services/txo-
 require "$workflow" '      - client0-bootstrap-group-ref-contract'
 require "$workflow" '"client0-bootstrap-group-ref-contract"'
 forbid_job_if "$workflow" "client0-bootstrap-group-ref-contract"
+require "$workflow" 'openbao-fabric-v2-phase1-argo-contract:'
+require "$workflow" 'OpenBao Fabric v2 Phase1 Argo contract'
+require_exactly_once "$workflow" '        run: python3 -m unittest tests/test_txo_fabric_openbao_v2_phase1_argo.py'
+require "$workflow" '      - openbao-fabric-v2-phase1-argo-contract'
+require "$workflow" '"openbao-fabric-v2-phase1-argo-contract"'
+forbid_job_if "$workflow" "openbao-fabric-v2-phase1-argo-contract"
 forbid "$workflow" 'continue-on-error:'
 
 printf 'release-channel contract: PASS\n'

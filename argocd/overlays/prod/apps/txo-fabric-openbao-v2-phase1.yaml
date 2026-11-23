@@ -1,0 +1,46 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: txo-fabric-openbao-v2-phase1
+  namespace: argocd
+spec:
+  description: Manual-only OpenBao Fabric v2 Phase 1 boundary
+  sourceRepos:
+    - https://github.com/charchess/vixens-fabric.git
+  destinations:
+    - namespace: txo-fabric-system
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: PersistentVolumeClaim
+    - group: apps
+      kind: StatefulSet
+    - group: ""
+      kind: Service
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: cert-manager.io
+      kind: Issuer
+    - group: cert-manager.io
+      kind: Certificate
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: txo-fabric-openbao-v2-phase1
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-options: FailOnSharedResource=true
+spec:
+  project: txo-fabric-openbao-v2-phase1
+  source:
+    repoURL: https://github.com/charchess/vixens-fabric.git
+    targetRevision: 6f84c67d00b9446637f868c3ac11e325293f8b4d
+    path: apps/60-services/txo-fabric/openbao-fabric-v2-phase1
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: txo-fabric-system
