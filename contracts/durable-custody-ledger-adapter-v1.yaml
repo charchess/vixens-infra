@@ -1,0 +1,171 @@
+apiVersion: custody.truxonline.io/v1
+kind: DurableCustodyLedgerAdapterV1Contract
+metadata:
+  name: durable-custody-ledger-adapter-v1
+spec:
+  executable: false
+  runtimeCapability: false
+  fieldRuleShape:
+    requiredKeys: [scalarRule, required, nullable, immutable, role]
+    allowedKeys: [scalarRule, required, nullable, immutable, role]
+    additionalProperties: false
+    rolePattern: '^[a-z][a-z0-9-]{1,63}$'
+  scalarRules:
+    ceremonyId: {type: string, pattern: '^cer-[0-9abcdefghjkmnpqrstvwxyz]{26}$', minLength: 30, maxLength: 30, additionalProperties: false}
+    ledgerId: {type: string, pattern: '^openbao-fabric-v2/cer-[0-9abcdefghjkmnpqrstvwxyz]{26}$', minLength: 48, maxLength: 48, derivedFrom: ceremonyId, derivation: 'openbao-fabric-v2/<ceremonyId>', additionalProperties: false}
+    eventId: {type: string, pattern: '^evt-[0-9abcdefghjkmnpqrstvwxyz]{26}$', minLength: 30, maxLength: 30, additionalProperties: false}
+    leaseId: {type: string, pattern: '^lease-[0-9abcdefghjkmnpqrstvwxyz]{26}$', minLength: 32, maxLength: 32, additionalProperties: false}
+    digest: {type: string, pattern: '^sha256:[0-9a-f]{64}$', minLength: 71, maxLength: 71, additionalProperties: false}
+    sequence: {type: integer, minimum: 0, maximum: 9223372036854775807, additionalProperties: false}
+    timestamp: {type: string, pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$', minLength: 20, maxLength: 20, format: rfc3339-utc-seconds, timezone: UTC, fractionalSeconds: forbidden, additionalProperties: false}
+    state: {type: string, enum: [draft, preflight-locked, tls-attested, initialization-started, custody-captured, initialized, unseal-in-progress, unsealed, bootstrap-handoff-complete, closed, refused, failed-before-init, failed-after-init, uncertain], additionalProperties: false}
+    activeLeaseState: {type: string, enum: [active, closed, absent], additionalProperties: false}
+    chainVerification: {type: string, enum: [verified, invalid, uncertain], additionalProperties: false}
+    refusalCode: {type: string, enum: [REFUSE_SCHEMA, REFUSE_CANONICAL_SERIALIZATION, REFUSE_LEDGER_COLLISION, REFUSE_EVENT_COLLISION, REFUSE_IDENTIFIER_BINDING, REFUSE_EVENT_SIZE, REFUSE_CAS_CONFLICT, REFUSE_LEASE_EXISTS, REFUSE_LEASE_MISMATCH, REFUSE_LEASE_EXPIRED, REFUSE_LEASE_HOLDER, REFUSE_STATE_MISMATCH, REFUSE_INVALID_TRANSITION, REFUSE_TERMINAL_STATE, REFUSE_TIMESTAMP_REGRESSION, REFUSE_MISSING_WITNESS_DIGEST, REFUSE_INVALID_EVIDENCE_DIGEST, REFUSE_NONTERMINAL_CLOSE, UNCERTAIN_STORAGE], additionalProperties: false}
+    runnerIdentityRef: {type: string, const: 'urn:truxonline:openbao-fabric-v2-custody:role:infra-custody-init-runner:v1', additionalProperties: false}
+  operations:
+    createLedger: {inputFields: [ceremonyId, ledgerId, eventId, requestDigest, authorizationDigest, evidenceDigest, occurredAt], outputFields: [resultSequence, resultState, resultHeadDigest, eventDigest], refusalFields: [code], eventKind: CREATE, stateEffect: {before: null, after: draft}, additionalProperties: false}
+    acquireLease: {inputFields: [ceremonyId, ledgerId, expectedSequence, expectedHeadDigest, expectedState, leaseId, holderIdentityRef, acquiredAt, expiresAt], outputFields: [resultSequence, resultState, resultHeadDigest, activeLeaseId, leaseStatus, eventDigest], refusalFields: [code], eventKind: LEASE_ACQUIRED, stateEffect: {before: draft, after: draft}, additionalProperties: false}
+    compareAndAppend: {inputFields: [ceremonyId, ledgerId, expectedSequence, expectedHeadDigest, leaseId, stateBefore, stateAfter, occurredAt, witnessReceiptDigest, evidenceDigest], outputFields: [resultSequence, resultState, priorHeadDigest, resultHeadDigest, eventDigest], refusalFields: [code], eventKind: TRANSITION_APPLIED, stateEffect: transition-table-v1, additionalProperties: false}
+    readVerifiedChain: {inputFields: [ceremonyId, ledgerId], outputFields: [resultSequence, resultState, resultHeadDigest, activeLeaseId, leaseStatus, verification], refusalFields: [code], eventKind: none, stateEffect: none, additionalProperties: false}
+    closeLease: {inputFields: [ceremonyId, ledgerId, expectedSequence, expectedHeadDigest, expectedState, leaseId, occurredAt, witnessReceiptDigest, evidenceDigest], outputFields: [resultSequence, resultState, resultHeadDigest, leaseStatus, eventDigest], refusalFields: [code], eventKind: LEASE_CLOSED, stateEffect: terminal-only, additionalProperties: false}
+  fieldRules:
+    createLedger:
+      input:
+        ceremonyId: {scalarRule: ceremonyId, required: true, nullable: false, immutable: true, role: ceremony-identity}
+        ledgerId: {scalarRule: ledgerId, required: true, nullable: false, immutable: true, role: derived-ledger-identity}
+        eventId: {scalarRule: eventId, required: true, nullable: false, immutable: true, role: genesis-event-identity}
+        requestDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: immutable-request-binding}
+        authorizationDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: execution-envelope-binding}
+        evidenceDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: source-preflight-evidence}
+        occurredAt: {scalarRule: timestamp, required: true, nullable: false, immutable: true, role: event-time}
+      output:
+        resultSequence: {scalarRule: sequence, required: true, nullable: false, immutable: true, role: resulting-sequence}
+        resultState: {scalarRule: state, required: true, nullable: false, immutable: true, role: resulting-state}
+        resultHeadDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: resulting-head}
+        eventDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: appended-event}
+      refusal:
+        code: {scalarRule: refusalCode, required: true, nullable: false, immutable: true, role: refusal-classification}
+    acquireLease:
+      input:
+        ceremonyId: {scalarRule: ceremonyId, required: true, nullable: false, immutable: true, role: ceremony-identity}
+        ledgerId: {scalarRule: ledgerId, required: true, nullable: false, immutable: true, role: ledger-identity}
+        expectedSequence: {scalarRule: sequence, required: true, nullable: false, immutable: true, role: cas-sequence}
+        expectedHeadDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: cas-head}
+        expectedState: {scalarRule: state, required: true, nullable: false, immutable: true, role: expected-current-state}
+        leaseId: {scalarRule: leaseId, required: true, nullable: false, immutable: true, role: one-shot-lease}
+        holderIdentityRef: {scalarRule: runnerIdentityRef, required: true, nullable: false, immutable: true, role: runner-holder}
+        acquiredAt: {scalarRule: timestamp, required: true, nullable: false, immutable: true, role: lease-start}
+        expiresAt: {scalarRule: timestamp, required: true, nullable: false, immutable: true, role: immutable-lease-expiry}
+      output:
+        resultSequence: {scalarRule: sequence, required: true, nullable: false, immutable: true, role: resulting-sequence}
+        resultState: {scalarRule: state, required: true, nullable: false, immutable: true, role: resulting-state}
+        resultHeadDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: resulting-head}
+        activeLeaseId: {scalarRule: leaseId, required: true, nullable: false, immutable: true, role: active-lease}
+        leaseStatus: {scalarRule: activeLeaseState, required: true, nullable: false, immutable: true, role: lease-status}
+        eventDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: appended-event}
+      refusal:
+        code: {scalarRule: refusalCode, required: true, nullable: false, immutable: true, role: refusal-classification}
+    compareAndAppend:
+      input:
+        ceremonyId: {scalarRule: ceremonyId, required: true, nullable: false, immutable: true, role: ceremony-identity}
+        ledgerId: {scalarRule: ledgerId, required: true, nullable: false, immutable: true, role: ledger-identity}
+        expectedSequence: {scalarRule: sequence, required: true, nullable: false, immutable: true, role: cas-sequence}
+        expectedHeadDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: cas-head}
+        leaseId: {scalarRule: leaseId, required: true, nullable: false, immutable: true, role: active-lease}
+        stateBefore: {scalarRule: state, required: true, nullable: false, immutable: true, role: expected-current-state}
+        stateAfter: {scalarRule: state, required: true, nullable: false, immutable: true, role: requested-next-state}
+        occurredAt: {scalarRule: timestamp, required: true, nullable: false, immutable: true, role: event-time}
+        witnessReceiptDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: witness-evidence}
+        evidenceDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: transition-evidence}
+      output:
+        resultSequence: {scalarRule: sequence, required: true, nullable: false, immutable: true, role: resulting-sequence}
+        resultState: {scalarRule: state, required: true, nullable: false, immutable: true, role: resulting-state}
+        priorHeadDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: predecessor-link}
+        resultHeadDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: resulting-head}
+        eventDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: appended-event}
+      refusal:
+        code: {scalarRule: refusalCode, required: true, nullable: false, immutable: true, role: refusal-classification}
+    readVerifiedChain:
+      input:
+        ceremonyId: {scalarRule: ceremonyId, required: true, nullable: false, immutable: true, role: ceremony-identity}
+        ledgerId: {scalarRule: ledgerId, required: true, nullable: false, immutable: true, role: ledger-identity}
+      output:
+        resultSequence: {scalarRule: sequence, required: true, nullable: false, immutable: true, role: current-sequence}
+        resultState: {scalarRule: state, required: true, nullable: false, immutable: true, role: current-state}
+        resultHeadDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: current-head}
+        activeLeaseId: {scalarRule: leaseId, required: false, nullable: true, immutable: true, role: active-lease}
+        leaseStatus: {scalarRule: activeLeaseState, required: true, nullable: false, immutable: true, role: lease-status}
+        verification: {scalarRule: chainVerification, required: true, nullable: false, immutable: true, role: chain-verification}
+      refusal:
+        code: {scalarRule: refusalCode, required: true, nullable: false, immutable: true, role: refusal-classification}
+    closeLease:
+      input:
+        ceremonyId: {scalarRule: ceremonyId, required: true, nullable: false, immutable: true, role: ceremony-identity}
+        ledgerId: {scalarRule: ledgerId, required: true, nullable: false, immutable: true, role: ledger-identity}
+        expectedSequence: {scalarRule: sequence, required: true, nullable: false, immutable: true, role: cas-sequence}
+        expectedHeadDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: cas-head}
+        expectedState: {scalarRule: state, required: true, nullable: false, immutable: true, role: expected-terminal-state}
+        leaseId: {scalarRule: leaseId, required: true, nullable: false, immutable: true, role: active-lease}
+        occurredAt: {scalarRule: timestamp, required: true, nullable: false, immutable: true, role: close-time}
+        witnessReceiptDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: closure-witness}
+        evidenceDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: closure-evidence}
+      output:
+        resultSequence: {scalarRule: sequence, required: true, nullable: false, immutable: true, role: resulting-sequence}
+        resultState: {scalarRule: state, required: true, nullable: false, immutable: true, role: resulting-state}
+        resultHeadDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: resulting-head}
+        leaseStatus: {scalarRule: activeLeaseState, required: true, nullable: false, immutable: true, role: lease-status}
+        eventDigest: {scalarRule: digest, required: true, nullable: false, immutable: true, role: appended-event}
+      refusal:
+        code: {scalarRule: refusalCode, required: true, nullable: false, immutable: true, role: refusal-classification}
+  transitionTable:
+    draft: [preflight-locked, refused, failed-before-init, uncertain]
+    preflight-locked: [tls-attested, refused, failed-before-init, uncertain]
+    tls-attested: [initialization-started, refused, failed-before-init, uncertain]
+    initialization-started: [custody-captured, failed-after-init, uncertain]
+    custody-captured: [initialized, failed-after-init, uncertain]
+    initialized: [unseal-in-progress, failed-after-init, uncertain]
+    unseal-in-progress: [unsealed, failed-after-init, uncertain]
+    unsealed: [bootstrap-handoff-complete, failed-after-init, uncertain]
+    bootstrap-handoff-complete: [closed, failed-after-init, uncertain]
+    closed: []
+    refused: []
+    failed-before-init: []
+    failed-after-init: []
+    uncertain: []
+  oracle:
+    schemaVersion: v1
+    canonicalization: RFC8785-JCS
+    yamlContractPath: contracts/durable-custody-ledger-adapter-v1.yaml
+    canonicalJsonPath: tests/fixtures/durable-custody-ledger-adapter-v1.oracle.jcs.json
+    comparison: exact-structural-equality
+    canonicalByteInvariant: >-
+      UTF-8(JCS(parse(yamlContractPath))) MUST equal
+      UTF-8(contents(canonicalJsonPath))
+    topLevelSpecKeys: [executable, runtimeCapability, fieldRuleShape, scalarRules, operations, fieldRules, transitionTable, oracle]
+    requiredOperations: [createLedger, acquireLease, compareAndAppend, readVerifiedChain, closeLease]
+    operationFieldBindingInvariant: >-
+      For each operation, inputFields MUST equal the ordered keys of
+      fieldRules.<operation>.input; outputFields MUST equal the ordered keys
+      of fieldRules.<operation>.output; refusalFields MUST equal the ordered
+      keys of fieldRules.<operation>.refusal.
+    scalarReferenceInvariant: >-
+      Every fieldRules scalarRule MUST name exactly one scalarRules key, and
+      every scalarRules key MUST be referenced by at least one fieldRule.
+    closedWorldInvariant: >-
+      No unlisted operation, map key, field binding, scalar rule, transition,
+      list member, scalar value, nullability mode, role, or output field is valid.
+    mutationPolicy: exhaustive-closed-world-v1
+    maxCanonicalEventBytes: 4096
+    maxLedgerChainEvents: 32
+    mutationInvariants:
+      scalar: [replace-each-leaf-with-different-same-type-value, replace-each-leaf-with-invalid-type, replace-each-leaf-with-null, reject-overlong-or-pattern-violating-string, reject-negative-overflow-float-and-boolean-for-integer, reject-unlisted-enum-value]
+      map: [remove-each-key, add-unknown-key, rename-each-key, replace-each-value, replace-map-with-scalar-list-and-null, accept-map-key-order-only-normalization-under-jcs]
+      list: [remove-each-element, duplicate-each-element, append-unknown-element, replace-each-element, reverse-list, replace-list-with-map-scalar-and-null]
+      binding: [remove-each-operation-field-binding, change-each-scalarRule-reference, toggle-required, toggle-nullable, toggle-immutable, change-role, add-unknown-binding-key]
+      crossReference: [remove-referenced-scalarRule, add-unreferenced-scalarRule, add-operation-field-without-fieldRule, add-fieldRule-not-listed-by-operation, duplicate-field-across-operation-sections, point-operation-to-unknown-fieldRuleSet]
+    mutationAcceptance: >-
+      Every mutation above MUST fail exact-oracle validation. The unmodified
+      YAML and canonical JCS JSON MUST pass. No fixture, backend, network,
+      runtime identity, witness, CA resolver, runner, OpenBao, Kubernetes,
+      Terraform or GitOps capability is authorized by this artifact.
