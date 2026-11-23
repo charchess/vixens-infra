@@ -78,6 +78,12 @@ require_exactly_once "$workflow" '        run: python3 -m unittest tests/test_tx
 require "$workflow" '      - openbao-fabric-v2-phase1-argo-contract'
 require "$workflow" '"openbao-fabric-v2-phase1-argo-contract"'
 forbid_job_if "$workflow" "openbao-fabric-v2-phase1-argo-contract"
+require "$workflow" 'openbao-fabric-v2-phase2-custody-issuer-contract:'
+require "$workflow" 'OpenBao Fabric v2 Phase2 custody issuer contract'
+require_exactly_once "$workflow" '        run: python3 -m unittest tests/test_openbao_fabric_v2_phase2_custody_issuer_contract.py'
+require "$workflow" '      - openbao-fabric-v2-phase2-custody-issuer-contract'
+require "$workflow" '"openbao-fabric-v2-phase2-custody-issuer-contract"'
+forbid_job_if "$workflow" "openbao-fabric-v2-phase2-custody-issuer-contract"
 forbid "$workflow" 'continue-on-error:'
 
 printf 'release-channel contract: PASS\n'
