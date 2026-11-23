@@ -4,10 +4,13 @@ metadata: {name: durable-custody-ledger-adapter-v1}
 spec:
   executable: false
   runtimeCapability: false
-  allowedInterface: [create, lease, transition, close, attest]
-  requiredMutationFields: [ledgerId, expectedVersion, headDigest, leaseId, expiresAt]
-  guarantees: [persistent, linearizable, append-only, expiry-enforced, uncertainty-terminal]
-  eventSchema: {allowedFields: [ledgerId, version, state, priorDigest, digest, expiresAt, metadata], forbiddenFields: [share, credential, token, rootToken, recoveryKey, payload, url, identity]}
-  attestationSchema: {allowedFields: [ledgerId, version, state, digest, auditOutcome, expiresAt], forbiddenFields: [share, credential, token, payload, signature, endpoint]}
-  forbiddenMethods: [delete, update, replace, query, list, route, client, provision, network]
-  conformanceVectors: {fixture: SyntheticCustodyLedgerFixture/v1, digestDomain: 'SyntheticCustodyLedgerFixture/v1\0', states: [REQUESTED, LEASED, WITNESSED, CLOSED, UNCERTAIN_STORAGE]}
+  scalarMetadata: {allowed: [requestId, ledgerId, version, state, digest, priorDigest, expiresAt, auditOutcome], maxStringLength: 128, digestPattern: '^[a-f0-9]{64}$', forbidNested: true}
+  forbiddenTokens: [secret, credential, auth, ca, spki, policy, provider, transport, command, argument, log, rawError, payload, recovery, root, share, password, key, jwt]
+  operations:
+    create: {input: [ledgerId, requestId, expectedVersion, expiresAt], output: [version, state, digest], pre: create-only, post: [version-0, priorDigest-null]}
+    lease: {input: [ledgerId, expectedVersion, headDigest, leaseId, expiresAt], output: [version, headDigest, leaseId], pre: head-equality, post: one-shot-expiry}
+    transition: {input: [ledgerId, expectedVersion, headDigest, nextState], output: [version, state, priorDigest, digest], pre: [sequence-equality, head-equality, legal-transition], post: [next-version, next-head]}
+    close: {input: [ledgerId, expectedVersion, headDigest], output: [version, state, digest], pre: head-equality, post: terminal}
+    attest: {input: [owner, contract, vector, ledgerId, headDigest, leaseId, expiresAt], output: [ledgerId, version, digest, auditOutcome, expiresAt], pre: binding-equality}
+  terminalStates: [CLOSED, UNCERTAIN_STORAGE]
+  guarantees: [persistent, linearizable, append-only, expiry-enforced, uncertainty-terminal, no-further-mutation]
