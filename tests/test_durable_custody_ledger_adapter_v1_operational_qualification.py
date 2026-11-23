@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 import unittest
 from pathlib import Path
 import yaml
@@ -15,6 +16,7 @@ def valid_attestation(attestation, binding, contract, fixture, provenance):
   if set(attestation) != set(rules): return False
   if attestation["contractDigest"] != "sha256:" + binding["contractRawYamlSha256"]: return False
   if attestation["vectorDigest"] != "sha256:" + binding["canonicalJcsSha256"]: return False
+  if type(attestation["reportDigest"]) is not str or re.fullmatch(r"sha256:[0-9a-f]{64}", attestation["reportDigest"]) is None: return False
   if attestation["scope"] not in rules["scope"]["enum"] or attestation["outcome"] not in rules["outcome"]["enum"]: return False
   if any(type(attestation[k]) is not str or len(attestation[k]) < rules[k].get("minLength", 1) or len(attestation[k]) > rules[k].get("maxLength", 10**9) for k in rules): return False
   if hashlib.sha256(contract).hexdigest() != binding["contractRawYamlSha256"] or hashlib.sha256(fixture).hexdigest() != binding["canonicalJcsSha256"]: return False
@@ -65,5 +67,7 @@ class DurableCustodyLedgerOperationalQualificationTests(unittest.TestCase):
   for key,value in (("scope","bad"),("outcome","bad"),("contractDigest","sha256:"+"0"*64),("vectorDigest","sha256:"+"0"*64)):
    m=dict(a); m[key]=value; self.assertFalse(valid_attestation(m,BINDING,c,j,p))
   m=dict(a); m["extra"]="x"; self.assertFalse(valid_attestation(m,BINDING,c,j,p)); m=dict(a); del m["reportDigest"]; self.assertFalse(valid_attestation(m,BINDING,c,j,p))
+  for bad in ("sha512:"+"0"*64, "sha256:"+"g"*64, "sha256:"+"0"*63, "x"*71, None, 1, type("DigestSubclass", (str,), {})("sha256:"+"0"*64)):
+   m=dict(a); m["reportDigest"]=bad; self.assertFalse(valid_attestation(m,BINDING,c,j,p))
   self.assertFalse(valid_attestation(a,BINDING,c+b" ",j,p)); self.assertFalse(valid_attestation(a,BINDING,c,j+b" ",p)); q=dict(p); q["canonicalJcsRawSha256"]="0"*64; self.assertFalse(valid_attestation(a,BINDING,c,j,q))
 if __name__ == "__main__": unittest.main()
