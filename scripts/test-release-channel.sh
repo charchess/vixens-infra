@@ -120,6 +120,12 @@ require_job_exactly_once "$workflow" "openbao-fabric-v2-synthetic-custody-ledger
 require "$workflow" '      - openbao-fabric-v2-synthetic-custody-ledger-fixture-v1'
 require "$workflow" '"openbao-fabric-v2-synthetic-custody-ledger-fixture-v1"'
 forbid_job_if "$workflow" "openbao-fabric-v2-synthetic-custody-ledger-fixture-v1"
+require "$workflow" 'openbao-fabric-v2-durable-custody-ledger-adapter-v1-contract:'
+require_exactly_once "$workflow" '        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_durable_custody_ledger_adapter_v1_contract.py'
+require_job_exactly_once "$workflow" "openbao-fabric-v2-durable-custody-ledger-adapter-v1-contract" '        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_durable_custody_ledger_adapter_v1_contract.py'
+require "$workflow" '      - openbao-fabric-v2-durable-custody-ledger-adapter-v1-contract'
+require "$workflow" '"openbao-fabric-v2-durable-custody-ledger-adapter-v1-contract"'
+forbid_job_if "$workflow" "openbao-fabric-v2-durable-custody-ledger-adapter-v1-contract"
 forbid "$workflow" 'openbao-fabric-v2-custody-ledger-adapter-v1'
 forbid "$workflow" 'tests/test_custody_ledger_adapter_v1.py'
 require "$workflow" 'openbao-fabric-v2-custody-init-runner-fixture:'
