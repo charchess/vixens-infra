@@ -19,8 +19,10 @@ class SyntheticCustodyLedgerFixture:
   with self._lock:
    es=self._l.get(lid)
    if uncertain:
-    if es:
-     last=es[-1];e={'kind':'event','version':last['version']+1,'state':'UNCERTAIN_STORAGE','payload':last['payload'],'priorDigest':last['digest']};e['digest']=digest('event',e,last['digest']);es.append(e)
+    if not es:raise Refusal('missing')
+    last=es[-1]
+    if type(expected)is not int or type(now)is not int or type(next_state)is not str or last['version']!=expected or last['payload']['expiresAt']<=now or last['state'] in TERMINAL:raise Refusal('CAS/expiry/terminal')
+    e={'kind':'event','version':last['version']+1,'state':'UNCERTAIN_STORAGE','payload':last['payload'],'priorDigest':last['digest']};e['digest']=digest('event',e,last['digest']);es.append(e)
     raise UncertainStorage('UNCERTAIN_STORAGE')
    if not es:raise Refusal('missing')
    last=es[-1]
