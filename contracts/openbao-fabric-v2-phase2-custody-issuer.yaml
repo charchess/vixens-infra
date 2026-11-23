@@ -1,0 +1,35 @@
+apiVersion: custody.truxonline.io/v1alpha1
+kind: OpenBaoFabricV2Phase2CustodyIssuerContract
+metadata:
+  name: openbao-fabric-v2-phase2-custody-issuer
+spec:
+  executable: false
+  runtimeCapability: false
+  gitOpsConsumer: false
+  requiresExistingAuthenticatedAuthority: true
+  cannotBootstrapInitialCustodyAlone: true
+  fabricImmutableVersionBinding:
+    repository: charchess/vixens-fabric
+    revision: 89d23b3e2b2011b53f21c605714beffb974e3d49
+    contractPath: apps/60-services/txo-fabric/openbao-fabric-v2-phase2-custody-bootstrap/contract.yaml
+    requiredSentinel: ABSENT_SEPARATE_VIXENS_INFRA_CONTRACT_REQUIRED
+  offlineIssuerEnvelope:
+    material: ABSENT_EXISTING_AUTHENTICATED_AUTHORITY_REQUIRED
+    policyPayload: ABSENT_OUT_OF_GIT_CUSTODY_REQUIRED
+  electraDelegationEnvelope:
+    identityRef: EXISTING_AUTHENTICATED_ELECTRA_RECOVERY_IDENTITY_REQUIRED
+    ttlSeconds: 900
+    renewable: false
+    storage: memory-only
+    wrapped: true
+  revokeReceiptSchema:
+    version: v1
+    allowedFields: [phase, phaseHash, fabricRevision, custodyAttribution, auditOutcome, revoked]
+    forbiddenFields: [credential, token, wrappedPayload, policyBody, providerPayload, root, share]
+  refusalModel:
+    refuseMissingAuthority: true
+    refuseRevisionMismatch: true
+    refuseMissingSentinel: true
+    refuseTTLAbove900Seconds: true
+    refuseRenewableOrPersistentOrUnwrappedDelegation: true
+    refuseCredentialOrPayloadMaterial: true
