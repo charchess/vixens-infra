@@ -9,6 +9,17 @@ BINDING = {"contractRawYamlSha256": "f8914ce4e29f0652be07bc4b5a080e5e0b518a1ba8b
 RULES = {"contractDigest": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$","minLength":71,"maxLength":71}, "vectorDigest": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$","minLength":71,"maxLength":71}, "scope": {"type":"string","enum":["provider-selection","operational-qualification","recovery-retention"]}, "outcome": {"type":"string","enum":["accepted","refused","not-executed"]}, "reportDigest": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$","minLength":71,"maxLength":71}}
 PROHIBITED = ["backend-selection","backend-configuration","backend-provisioning","url","identity","credential","adapter-implementation","runner","openbao","kubernetes","argo","gitops","endpoint","host","socket","dsn","tls","secretref","serviceaccount","exec","webhook","transport"]
 def load(path): return yaml.safe_load(path.read_text(encoding="utf-8"))
+def valid_attestation(attestation, binding, contract, fixture, provenance):
+ try:
+  rules = RULES
+  if set(attestation) != set(rules): return False
+  if attestation["contractDigest"] != "sha256:" + binding["contractRawYamlSha256"]: return False
+  if attestation["vectorDigest"] != "sha256:" + binding["canonicalJcsSha256"]: return False
+  if attestation["scope"] not in rules["scope"]["enum"] or attestation["outcome"] not in rules["outcome"]["enum"]: return False
+  if any(type(attestation[k]) is not str or len(attestation[k]) < rules[k].get("minLength", 1) or len(attestation[k]) > rules[k].get("maxLength", 10**9) for k in rules): return False
+  if hashlib.sha256(contract).hexdigest() != binding["contractRawYamlSha256"] or hashlib.sha256(fixture).hexdigest() != binding["canonicalJcsSha256"]: return False
+  return provenance["kind"] == binding["provenanceIdentity"] and provenance["contractRawSha256"] == binding["contractRawYamlSha256"] and provenance["canonicalJcsRawSha256"] == binding["canonicalJcsSha256"]
+ except (KeyError, TypeError): return False
 class DurableCustodyLedgerOperationalQualificationTests(unittest.TestCase):
  def test_closed_documents_bind_pr132_immutably(self):
   for name,path in CONTRACTS.items():
@@ -47,4 +58,12 @@ class DurableCustodyLedgerOperationalQualificationTests(unittest.TestCase):
    for field in ("contractRawYamlSha256", "canonicalJcsSha256"):
     changed = dict(binding); changed[field] = "f" * 64
     self.assertNotEqual(changed, BINDING)
+ def test_closed_attestation_validator_rejects_real_mutations(self):
+  c=(ROOT/"contracts/durable-custody-ledger-adapter-v1.yaml").read_bytes(); j=(ROOT/"tests/fixtures/durable-custody-ledger-adapter-v1.oracle.jcs.json").read_bytes(); p=load(ROOT/BINDING["provenancePath"])
+  a={"contractDigest":"sha256:"+BINDING["contractRawYamlSha256"],"vectorDigest":"sha256:"+BINDING["canonicalJcsSha256"],"scope":"operational-qualification","outcome":"not-executed","reportDigest":"sha256:"+"0"*64}
+  self.assertTrue(valid_attestation(a,BINDING,c,j,p))
+  for key,value in (("scope","bad"),("outcome","bad"),("contractDigest","sha256:"+"0"*64),("vectorDigest","sha256:"+"0"*64)):
+   m=dict(a); m[key]=value; self.assertFalse(valid_attestation(m,BINDING,c,j,p))
+  m=dict(a); m["extra"]="x"; self.assertFalse(valid_attestation(m,BINDING,c,j,p)); m=dict(a); del m["reportDigest"]; self.assertFalse(valid_attestation(m,BINDING,c,j,p))
+  self.assertFalse(valid_attestation(a,BINDING,c+b" ",j,p)); self.assertFalse(valid_attestation(a,BINDING,c,j+b" ",p)); q=dict(p); q["canonicalJcsRawSha256"]="0"*64; self.assertFalse(valid_attestation(a,BINDING,c,j,q))
 if __name__ == "__main__": unittest.main()
