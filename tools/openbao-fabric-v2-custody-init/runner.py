@@ -9,7 +9,7 @@ class CeremonyLedger:
  def create(self,r):
   if r['requestId'] in self._entries: raise Refusal('create-only CAS ledger')
   e={'requestId':r['requestId'],'version':0,'state':'requested','fabricRevision':r['fabricRevision'],'endpointIdentity':ENDPOINT,'operatorAttribution':'ABSENT_OFFLINE_FIXTURE','witnessAttribution':'ABSENT_OFFLINE_FIXTURE','auditOutcome':'fixture-accepted','expiresAt':r['expiresAt']};self._entries[r['requestId']]=e;return e
-def verify_tls_fixture(ca_der, expected_digest=CA_SHA256): return hashlib.sha256(ca_der).hexdigest()==expected_digest
+def verify_tls_fixture(ca_der): return hashlib.sha256(ca_der).hexdigest()==CA_SHA256
 def _grammar(r):
  if r['protocolVersion']!='v2' or not re.fullmatch(r'[a-z0-9][a-z0-9._-]{0,63}',r['fabricRevision']) or not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,63}',r['requestId']):raise Refusal('bounded request grammar')
 def validate_fixture_request(r,ledger,now,server_name=SNI):
