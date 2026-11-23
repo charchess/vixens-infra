@@ -108,6 +108,12 @@ require_job_exactly_once "$workflow" "openbao-fabric-v2-custody-init-runner-fixt
 require "$workflow" '      - openbao-fabric-v2-custody-init-runner-fixture'
 require "$workflow" '"openbao-fabric-v2-custody-init-runner-fixture"'
 forbid_job_if "$workflow" "openbao-fabric-v2-custody-init-runner-fixture"
+require "$workflow" 'openbao-fabric-v2-custody-init-operational-execution-contract:'
+require "$workflow" 'OpenBao Fabric v2 custody-init operational execution contract'
+require_exactly_once "$workflow" '        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_openbao_fabric_v2_custody_init_operational_execution_contract.py'
+require "$workflow" '      - openbao-fabric-v2-custody-init-operational-execution-contract'
+require "$workflow" '"openbao-fabric-v2-custody-init-operational-execution-contract"'
+forbid_job_if "$workflow" "openbao-fabric-v2-custody-init-operational-execution-contract"
 forbid "$workflow" 'continue-on-error:'
 
 printf 'release-channel contract: PASS\n'
