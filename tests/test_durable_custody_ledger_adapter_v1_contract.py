@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 import unittest
 from pathlib import Path
@@ -8,12 +9,39 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "contracts/durable-custody-ledger-adapter-v1.yaml"
 FIXTURE = ROOT / "tests/fixtures/durable-custody-ledger-adapter-v1.oracle.jcs.json"
+PROVENANCE = ROOT / "tests/fixtures/durable-custody-ledger-adapter-v1.provenance.yaml"
 
 
 def jcs(value):
     # The normative document contains only JSON-native strings, integers, bools,
     # nulls, arrays and objects; this is RFC 8785-compatible for that domain.
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
+
+
+def strict_safe_load(raw):
+    class StrictLoader(yaml.SafeLoader):
+        pass
+    def mapping(loader, node, deep=False):
+        result = {}
+        for key_node, value_node in node.value:
+            key = loader.construct_object(key_node, deep=deep)
+            if key in result:
+                raise ValueError("duplicate YAML key")
+            result[key] = loader.construct_object(value_node, deep=deep)
+        return result
+    StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, mapping)
+    value = yaml.load(raw, Loader=StrictLoader)
+    def json_native(item):
+        if item is None or type(item) in (str, int, bool):
+            return True
+        if isinstance(item, list):
+            return all(json_native(child) for child in item)
+        if isinstance(item, dict):
+            return all(type(key) is str and json_native(child) for key, child in item.items())
+        return False
+    if not json_native(value):
+        raise ValueError("non-JSON-native YAML value")
+    return value
 
 
 def load_yaml(path=CONTRACT):
@@ -96,6 +124,22 @@ class DurableCustodyLedgerAdapterV1ContractTests(unittest.TestCase):
         self.assertEqual(jcs(contract), FIXTURE.read_bytes())
         cross_references(contract)
         self.assertTrue(valid(contract))
+
+    def test_provenance_binds_raw_sources_and_safe_yaml_jcs_derivation(self):
+        provenance = yaml.safe_load(PROVENANCE.read_text(encoding="utf-8"))
+        self.assertEqual(provenance["contractRawSha256"], hashlib.sha256(CONTRACT.read_bytes()).hexdigest())
+        self.assertEqual(provenance["canonicalJcsRawSha256"], hashlib.sha256(FIXTURE.read_bytes()).hexdigest())
+        self.assertEqual(provenance["canonicalization"], "RFC8785-JCS")
+        self.assertEqual(provenance["encoding"], "UTF-8")
+        self.assertEqual(provenance["yamlParser"], "strict_safe_load")
+        self.assertEqual(provenance["strictParserRequirements"], ["reject-duplicate-keys", "reject-unknown-tags", "reject-non-json-native-values"])
+        self.assertEqual(jcs(strict_safe_load(CONTRACT.read_text(encoding="utf-8"))), FIXTURE.read_bytes())
+        with self.assertRaises(ValueError):
+            strict_safe_load("""a: 1
+a: 2
+""")
+        with self.assertRaises(yaml.constructor.ConstructorError):
+            strict_safe_load("value: !unknown tagged\\n")
 
     def test_every_recursive_map_list_and_scalar_mutation_is_rejected(self):
         canonical = load_oracle()

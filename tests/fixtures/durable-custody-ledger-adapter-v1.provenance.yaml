@@ -1,0 +1,18 @@
+apiVersion: custody.truxonline.io/v1
+kind: DurableCustodyLedgerAdapterV1Provenance
+metadata:
+  name: durable-custody-ledger-adapter-v1
+contractPath: contracts/durable-custody-ledger-adapter-v1.yaml
+contractRawSha256: f8914ce4e29f0652be07bc4b5a080e5e0b518a1ba8b3b24f054184800b467105
+canonicalJcsPath: tests/fixtures/durable-custody-ledger-adapter-v1.oracle.jcs.json
+canonicalJcsRawSha256: 4cd234ccc8080ac7ee4803a91321f51cd5ae8377d2c786375bbc0cdd6ab5823c
+encoding: UTF-8
+canonicalization: RFC8785-JCS
+yamlParser: strict_safe_load
+strictParserRequirements:
+  - reject-duplicate-keys
+  - reject-unknown-tags
+  - reject-non-json-native-values
+derivation: UTF-8(RFC8785-JCS(safe_load(contractPath))) == raw(canonicalJcsPath)
+immutable: true
+additionalProperties: false
