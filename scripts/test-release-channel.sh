@@ -113,6 +113,15 @@ require_job_exactly_once "$workflow" "openbao-fabric-v2-custody-init-inactive-ru
 require "$workflow" '      - openbao-fabric-v2-custody-init-inactive-runner'
 require "$workflow" '"openbao-fabric-v2-custody-init-inactive-runner"'
 forbid_job_if "$workflow" "openbao-fabric-v2-custody-init-inactive-runner"
+require "$workflow" 'openbao-fabric-v2-synthetic-custody-ledger-fixture-v1:'
+require "$workflow" 'OpenBao Fabric v2 synthetic custody ledger fixture v1'
+require_exactly_once "$workflow" '        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_synthetic_custody_ledger_fixture_v1.py'
+require_job_exactly_once "$workflow" "openbao-fabric-v2-synthetic-custody-ledger-fixture-v1" '        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_synthetic_custody_ledger_fixture_v1.py'
+require "$workflow" '      - openbao-fabric-v2-synthetic-custody-ledger-fixture-v1'
+require "$workflow" '"openbao-fabric-v2-synthetic-custody-ledger-fixture-v1"'
+forbid_job_if "$workflow" "openbao-fabric-v2-synthetic-custody-ledger-fixture-v1"
+forbid "$workflow" 'openbao-fabric-v2-custody-ledger-adapter-v1'
+forbid "$workflow" 'tests/test_custody_ledger_adapter_v1.py'
 require "$workflow" 'openbao-fabric-v2-custody-init-runner-fixture:'
 require "$workflow" 'OpenBao Fabric v2 custody-init runner fixture'
 require_exactly_once "$workflow" '        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests/test_openbao_fabric_v2_custody_init_runner.py'
