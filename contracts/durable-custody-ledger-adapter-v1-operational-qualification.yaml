@@ -1,0 +1,97 @@
+apiVersion: custody.truxonline.io/v1
+kind: DurableCustodyLedgerAdapterV1OperationalQualification
+metadata:
+  name: durable-custody-ledger-adapter-v1-operational-qualification
+spec:
+  executable: false
+  runtimeCapability: false
+  pr132ContractPath: contracts/durable-custody-ledger-adapter-v1.yaml
+  conformanceAttestation:
+    fieldRules:
+      contractDigest: &id001
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$
+        minLength: 71
+        maxLength: 71
+      vectorDigest:
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$
+        minLength: 71
+        maxLength: 71
+      scope: &id002
+        type: string
+        enum:
+        - provider-selection
+        - operational-qualification
+        - recovery-retention
+      outcome: &id003
+        type: string
+        enum:
+        - accepted
+        - refused
+        - not-executed
+      reportDigest: &id004
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$
+        minLength: 71
+        maxLength: 71
+    bindings:
+    - contractDigest
+    - vectorDigest
+    - scope
+    - outcome
+    - reportDigest
+    additionalProperties: false
+  isolationAttestation:
+    fieldRules:
+      contractDigest: *id001
+      scope: *id002
+      outcome: *id003
+      reportDigest: *id004
+    bindings:
+    - contractDigest
+    - scope
+    - outcome
+    - reportDigest
+    additionalProperties: false
+  prohibitedSurfaces:
+  - backend-selection
+  - backend-configuration
+  - backend-provisioning
+  - url
+  - identity
+  - credential
+  - adapter-implementation
+  - runner
+  - openbao
+  - kubernetes
+  - argo
+  - gitops
+  - endpoint
+  - host
+  - socket
+  - dsn
+  - tls
+  - secretref
+  - serviceaccount
+  - exec
+  - webhook
+  - transport
+  qualification:
+    operationalExecution: prohibited
+    requiredReports:
+    - conformance-report
+    - isolation-report
+    - operational-gate-report
+    gate: independent-qa-and-runtime-authorization
+  pr132Binding:
+    contractRawYamlSha256: f8914ce4e29f0652be07bc4b5a080e5e0b518a1ba8b3b24f054184800b467105
+    canonicalJcsSha256: 4cd234ccc8080ac7ee4803a91321f51cd5ae8377d2c786375bbc0cdd6ab5823c
+    provenanceIdentity: DurableCustodyLedgerAdapterV1Provenance
+    provenancePath: tests/fixtures/durable-custody-ledger-adapter-v1.provenance.yaml
+    interface:
+    - createLedger
+    - acquireLease
+    - compareAndAppend
+    - readVerifiedChain
+    - closeLease
