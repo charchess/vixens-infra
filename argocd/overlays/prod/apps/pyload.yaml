@@ -14,7 +14,7 @@ spec:
   source:
     path: apps/20-media/pyload/overlays/prod
     repoURL: https://github.com/charchess/vixens-infra.git
-    targetRevision: a10b6e0c9a154e4de470b12bb99413b2c5951644
+    targetRevision: prod-stable
   syncPolicy:
     automated:
       prune: true

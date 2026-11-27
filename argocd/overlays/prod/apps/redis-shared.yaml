@@ -12,7 +12,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/charchess/vixens-infra.git
-    targetRevision: 1a2c3cf29953ec6a88ea591ea2009e14b0b180a2 # The Git branch corresponding to the environment
+    targetRevision: prod-stable # The Git branch corresponding to the environment
     path: apps/04-databases/redis-shared/overlays/prod # The path to the app's overlay
   destination:
     server: https://kubernetes.default.svc

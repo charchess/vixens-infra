@@ -12,7 +12,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/charchess/vixens-infra.git
-    targetRevision: 2ae068fd5b2a9828b6a092384353896b3add7a69
+    targetRevision: prod-stable
     path: apps/00-infra/reloader/overlays/prod
   destination:
     server: https://kubernetes.default.svc

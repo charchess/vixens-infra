@@ -21,10 +21,10 @@ spec:
         valueFiles:
           - $values/apps/02-monitoring/fluent-bit/base/values.yaml
     - repoURL: https://github.com/charchess/vixens-infra.git
-      targetRevision: 2ae068fd5b2a9828b6a092384353896b3add7a69
+      targetRevision: prod-stable
       ref: values
     - repoURL: https://github.com/charchess/vixens-infra.git
-      targetRevision: 2ae068fd5b2a9828b6a092384353896b3add7a69
+      targetRevision: prod-stable
       path: apps/02-monitoring/fluent-bit/overlays/prod
   destination:
     server: https://kubernetes.default.svc

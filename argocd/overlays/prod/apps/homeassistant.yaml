@@ -13,7 +13,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/charchess/vixens-infra.git
-    targetRevision: a10b6e0c9a154e4de470b12bb99413b2c5951644
+    targetRevision: prod-stable
     path: apps/10-home/homeassistant/overlays/prod
   destination:
     server: https://kubernetes.default.svc
