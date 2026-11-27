@@ -12,7 +12,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/charchess/vixens-infra.git
-    targetRevision: bc95c075ca9c032a6d71a169082db9a578903628
+    targetRevision: prod-stable
     path: apps/00-infra/maturity-controller/base
   destination:
     server: https://kubernetes.default.svc

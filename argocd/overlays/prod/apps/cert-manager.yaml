@@ -27,10 +27,10 @@ spec:
           - $values/apps/00-infra/cert-manager/values/prod.yaml
     # Values from Git repository
     - repoURL: https://github.com/charchess/vixens-infra.git
-      targetRevision: 29b80b61847a68683ca6b72b626d8226bd48de68
+      targetRevision: prod-stable
       ref: values
     - repoURL: https://github.com/charchess/vixens-infra.git
-      targetRevision: 29b80b61847a68683ca6b72b626d8226bd48de68
+      targetRevision: prod-stable
       path: apps/00-infra/cert-manager/extra
 
   syncPolicy:

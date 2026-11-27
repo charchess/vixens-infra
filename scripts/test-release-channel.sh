@@ -139,4 +139,36 @@ require "$workflow" '"openbao-fabric-v2-custody-init-runner-fixture"'
 forbid_job_if "$workflow" "openbao-fabric-v2-custody-init-runner-fixture"
 forbid "$workflow" 'continue-on-error:'
 
+# Production child Applications sourced from this repository must follow the
+# canonical moving production pointer. Pinned SHAs here create a two-release
+# delivery chain: first merge the workload, then separately advance the child.
+while IFS= read -r app; do
+  repo_url=$(awk '/^[[:space:]]*repoURL:/{print $2; exit}' "$app")
+  test "$repo_url" = 'https://github.com/charchess/vixens-infra.git' || continue
+  target=$(awk '/^[[:space:]]*targetRevision:/{print $2; exit}' "$app")
+  test "$target" = 'prod-stable' || fail "repository-local prod Application ${app#$root/} must target prod-stable, found ${target:-missing}"
+done < <(find "$root/argocd/overlays/prod/apps" -maxdepth 1 -type f -name '*.yaml' | sort)
+if grep -REq 'repoURL: https://github\.com/charchess/vixens-infra\.git, targetRevision: [0-9a-f]{40}' "$root/argocd/overlays/prod/apps"; then
+  fail "repository-local prod Application must not pin a commit SHA inline"
+fi
+python3 - "$root" <<'PY'
+from pathlib import Path
+import re
+root = Path(__import__('sys').argv[1])
+repo = 'https://github.com/charchess/vixens-infra.git'
+violations = []
+for path in sorted((root / 'argocd/overlays/prod/apps').glob('*.yaml')):
+    current = None
+    for line in path.read_text().splitlines():
+        match = re.match(r'^\s*(?:-\s+)?repoURL:\s*(\S+)', line)
+        if match:
+            current = match.group(1)
+            continue
+        match = re.match(r'^\s*targetRevision:\s*([^\s#]+)', line)
+        if match and current == repo and match.group(1) != 'prod-stable':
+            violations.append(f'{path.relative_to(root)}: {match.group(1)}')
+if violations:
+    raise SystemExit('repository-local prod Application pins must be prod-stable: ' + ', '.join(violations))
+PY
+
 printf 'release-channel contract: PASS\n'

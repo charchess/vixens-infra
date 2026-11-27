@@ -12,7 +12,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/charchess/vixens-infra.git
-    targetRevision: 5504484953053708d6cb62c48e18a05d9e57ce78
+    targetRevision: prod-stable
     path: apps/70-tools/headlamp/overlays/prod
   destination:
     server: https://kubernetes.default.svc

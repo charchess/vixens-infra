@@ -12,7 +12,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/charchess/vixens-infra.git
-    targetRevision: 95170aa235cc3b3d7ae35b8b4008ace2d14b8683
+    targetRevision: prod-stable
     path: apps/40-network/adguard-home/overlays/prod
   destination:
     server: https://kubernetes.default.svc

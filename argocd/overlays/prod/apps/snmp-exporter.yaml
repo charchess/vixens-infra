@@ -14,7 +14,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/charchess/vixens-infra.git
-    targetRevision: 90b209181164ebd14fb94d93e6177da15d87c565
+    targetRevision: prod-stable
     path: apps/02-monitoring/snmp-exporter/overlays/prod
   destination:
     server: https://kubernetes.default.svc

@@ -27,11 +27,11 @@ spec:
           - $values/apps/00-infra/cert-manager-webhook-gandi/values/prod.yaml
     # Values from Git repository
     - repoURL: https://github.com/charchess/vixens-infra.git
-      targetRevision: 6f902e0ed4057efd2d6d5c53aee43a123b0023c3
+      targetRevision: prod-stable
       ref: values
     # Kustomize overlay for pod annotations (chart has no podAnnotations support)
     - repoURL: https://github.com/charchess/vixens-infra.git
-      targetRevision: 6f902e0ed4057efd2d6d5c53aee43a123b0023c3
+      targetRevision: prod-stable
       path: apps/00-infra/cert-manager-webhook-gandi/overlays/prod
   # SINTEF chart v0.5.2 ignores topologySpreadConstraints in values.
   # Injected at Deployment admission by mutate-pod-annotations Rule 10.

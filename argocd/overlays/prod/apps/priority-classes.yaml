@@ -14,7 +14,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/charchess/vixens-infra.git
-    targetRevision: fe1688c14548e38472ddf354790af11367f16ef8
+    targetRevision: prod-stable
     path: apps/_shared/priority-classes/base
   destination:
     server: https://kubernetes.default.svc

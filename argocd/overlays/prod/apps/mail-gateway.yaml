@@ -14,7 +14,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/charchess/vixens-infra.git
-    targetRevision: a21d45477acfbd07edf525bfa59a110c081b5fe8
+    targetRevision: prod-stable
     path: apps/40-network/mail-gateway/overlays/prod
   destination:
     server: https://kubernetes.default.svc

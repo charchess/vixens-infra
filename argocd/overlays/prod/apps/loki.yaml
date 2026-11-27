@@ -15,7 +15,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/charchess/vixens-infra.git
-    targetRevision: c67c32a9b43e52b14ec4e312f6e87047c5cc2e95
+    targetRevision: prod-stable
     path: apps/02-monitoring/loki/overlays/prod
   destination:
     server: https://kubernetes.default.svc

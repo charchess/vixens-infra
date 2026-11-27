@@ -12,7 +12,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/charchess/vixens-infra.git
-    targetRevision: f00f7c97b390c82787e7b01f0c51bae972371dc8
+    targetRevision: prod-stable
     path: apps/00-infra/prometheus-operator-crds/base
   destination:
     server: https://kubernetes.default.svc
